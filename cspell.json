@@ -1,0 +1,32 @@
+{
+    "version": "0.2",
+    "language": "en",
+    "useGitignore": true,
+    "ignorePaths": [
+        ".git/**",
+        ".vscode/**",
+        "build/**",
+        "cspell.json",
+        "dist/**",
+        "htmlcov/**",
+        "node_modules/**",
+        "package-lock.json"
+    ],
+    "ignoreRegExpList": [
+        "color: .*"
+    ],
+    "words": [
+        "bradlc",
+        "cspell",
+        "davidanson",
+        "dbaeumer",
+        "esbenp",
+        "htmlcov",
+        "mikestead",
+        "pagefind",
+        "ryancswallace",
+        "seccomp",
+        "vivaxy",
+        "withastro"
+    ]
+}
