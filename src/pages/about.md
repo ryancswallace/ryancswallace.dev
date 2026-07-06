@@ -4,35 +4,60 @@ title: "About"
 description: "About Ryan Wallace, his work, and what he writes about."
 ---
 
-Hi, I’m Ryan Wallace.
+Hi, I'm Ryan.
 
 I build data systems and collaborate on research at the Federal Reserve Bank of
-Boston.
+Boston. This site is my home base for notes, projects, and technical writing.
 
-## Quick Facts
+## Snapshot
 
-**Location**: Boston, MA
+- **Location:** Boston, MA
+- **Background:** Computer Science and Statistics at Harvard; data science and
+  engineering at the Federal Reserve
+- **Current work:** Data systems; research infrastructure; NLP in economics
+  research
+- **Interests:** AI/ML; distributed systems; databases; Linux; developer tooling
 
-**Background**: Computer Science and Statistics @ Harvard | Data Science and
-Engineering @ Federal Reserve
+## What I Care About
 
-**Interests**: AI/ML, distributed systems, databases, Linux
+I'm drawn to software that makes complicated work feel steadier. A few themes
+show up often in my work:
+
+- Building interfaces between research questions and production systems
+- Using AI and ML to answer empirical questions and to support practical
+  workflows
+- Designing tools and data pipelines that are easy to use and to reason about
+
+## This Site
+
+This site is a small portfolio, blog, and personal reference shelf.
+
+I use it to collect:
+
+- Project notes and implementation details
+- Technical posts about systems, data, and development workflows
+- References for tools I use often
+
+## Elsewhere
+
+- [GitHub](https://github.com/ryancswallace)
+- [LinkedIn](https://www.linkedin.com/in/ryancswallace/)
+- [Source code for this site](https://github.com/ryancswallace/ryancswallace.dev)
 
 ## Get In Touch
 
-The easiest way to reach me is by email
-<[ryancswallace@gmail.com](mailto:ryancswallace@gmail.com)>.
+The easiest way to reach me is by email:
+[ryancswallace@gmail.com](mailto:ryancswallace@gmail.com).
 
 ## Copyright and Licensing
 
-© 2026 Ryan Wallace.
+Copyright © Ryan Wallace.
 
-Site content is licensed under Creative Commons Attribution 4.0 International
-(CC BY 4.0).
+Unless otherwise noted, site content is licensed under
+[Creative Commons Attribution 4.0 International](https://creativecommons.org/licenses/by/4.0/)
+(CC BY 4.0). Site source code is licensed under the
+[MIT License](https://opensource.org/license/mit).
 
-Site source code is licensed under the MIT License.
-
-## Site
-
-Built with Astro + AstroPaper. You can find the source code on
-[GitHub](https://github.com/ryancswallace/ryancswallace.dev).
+*Disclaimer: The views expressed herein are my own and do not indicate*
+*concurrence by the Federal Reserve Bank of Boston, the principals of the Board*
+*of Governors, or the Federal Reserve System.*
