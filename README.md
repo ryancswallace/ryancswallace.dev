@@ -2,7 +2,7 @@
 
 Built with **Astro** + **AstroPaper**. Deployed on **GitHub Pages**.
 
-**Live:** https://ryancswallace.dev
+**Live:** `https://ryancswallace.dev`
 
 ---
 

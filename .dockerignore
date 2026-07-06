@@ -18,6 +18,7 @@
 node_modules/
 **/node_modules/
 .npm/
+.pnpm-store/
 npm-debug.log*
 pnpm-debug.log*
 yarn-debug.log*
