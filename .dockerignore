@@ -1,8 +1,48 @@
 # Ignore Astro files
 *.astro
 
-# Ignore node_modules directory
-node_modules/
+# Version control and local agent state
+.git
+.agents
+.codex
 
-# Ignore build output
+# Local environments and secrets
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+.envrc
+
+# Node dependencies and package manager logs
+node_modules/
+**/node_modules/
+.npm/
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build, test, benchmark, and documentation artifacts
+.benchmarks/
+.coverage
+.coverage.*
+coverage.xml
+build/
 dist/
+htmlcov/
+reports/
+site/
+
+# Editor, OS, and local notes
+.DS_Store
+**/.DS_Store
+.idea/
+.vscode/
+Thumbs.db
+
+# Notes
+TODO.md
+
+# Astro reference files
+reference/

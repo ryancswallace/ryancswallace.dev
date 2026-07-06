@@ -3,8 +3,8 @@ export const SITE = {
   author: "Ryan Wallace",
   profile: "https://ryancswallace.dev/",
   desc: "Personal portfolio site built with Astro.",
-  title: "ryancswallace.dev",
-  ogImage: "astropaper-og.jpg",
+  title: "Ryan Wallace",
+  ogImage: "rw_favicons/android-chrome-512x512.png",
   lightAndDarkMode: true,
   editPost: {
     enabled: true,
