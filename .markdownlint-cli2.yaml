@@ -1,0 +1,21 @@
+config:
+  default: true
+  MD013: false
+  MD024:
+    siblings_only: true
+  MD041: false
+
+gitignore: true
+
+globs:
+  - "**/*.md"
+
+ignores:
+  - ".coverage/**"
+  - ".git/**"
+  - "build/**"
+  - "dist/**"
+  - "node_modules/**"
+  - "reports/**"
+  - "vendor/**"
+
