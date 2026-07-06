@@ -1,0 +1,75 @@
+{
+  "name": "ryancswallace.dev",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "args": {
+      "PNPM_VERSION": "10.11.1"
+    }
+  },
+  "remoteUser": "node",
+  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+  "containerEnv": {
+    "ASTRO_TELEMETRY_DISABLED": "1"
+  },
+  "updateContentCommand": "${containerWorkspaceFolder}/.devcontainer/scripts/install-dev-tools.sh",
+  "postStartCommand": "${containerWorkspaceFolder}/.devcontainer/scripts/install-dev-tools.sh",
+  "forwardPorts": [
+    4321,
+    4322
+  ],
+  "portsAttributes": {
+    "4321": {
+      "label": "Astro dev server",
+      "onAutoForward": "notify"
+    },
+    "4322": {
+      "label": "Astro preview server",
+      "onAutoForward": "silent"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "astro-build.astro-vscode",
+        "bradlc.vscode-tailwindcss",
+        "davidanson.vscode-markdownlint",
+        "dbaeumer.vscode-eslint",
+        "editorconfig.editorconfig",
+        "esbenp.prettier-vscode",
+        "github.vscode-github-actions",
+        "github.vscode-pull-request-github",
+        "mikestead.dotenv",
+        "ms-azuretools.vscode-containers",
+        "redhat.vscode-yaml",
+        "streetsidesoftware.code-spell-checker",
+        "unifiedjs.vscode-mdx",
+        "vivaxy.vscode-conventional-commits"
+      ],
+      "settings": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+          "source.fixAll.eslint": "explicit"
+        },
+        "eslint.validate": [
+          "javascript",
+          "javascriptreact",
+          "typescript",
+          "typescriptreact",
+          "astro"
+        ],
+        "prettier.prettierPath": "node_modules/prettier/index.cjs",
+        "ts.tsdk.path": "node_modules/typescript/lib"
+      }
+    }
+  },
+  "mounts": [
+    "source=${localEnv:HOME}/.gitconfig,target=/home/vscode/.gitconfig,type=bind,consistency=cached",
+    "source=${localEnv:HOME}/.local/share/devcontainer-bin,target=/home/vscode/.local/share/host-bin,type=bind,consistency=cached",
+    "source=${localEnv:HOME}/.codex-devcontainer,target=/home/vscode/.codex,type=bind,consistency=cached"
+  ],
+  "runArgs": [
+    "--security-opt",
+    "seccomp=unconfined"
+  ]
+}
