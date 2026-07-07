@@ -53,6 +53,6 @@ Unless otherwise noted, site content is licensed under
 (CC BY 4.0). Site source code is licensed under the
 [MIT License](https://opensource.org/license/mit).
 
-_Disclaimer: The views expressed herein are my own and do not indicate_
+<small>_Disclaimer: The views expressed herein are my own and do not indicate_
 _concurrence by the Federal Reserve Bank of Boston, the principals of the Board_
-_of Governors, or the Federal Reserve System._
+_of Governors, or the Federal Reserve System._</small>
