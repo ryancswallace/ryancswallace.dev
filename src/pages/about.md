@@ -43,7 +43,7 @@ This site is a small portfolio, blog, and reference:
 ## Get In Touch
 
 The easiest way to reach me is by email:
-[ryancswallace@gmail.com](mailto:ryancswallace@gmail.com).
+[ryan@ryancswallace.dev](mailto:ryan@ryancswallace.dev).
 
 ## Copyright and Licensing
 
