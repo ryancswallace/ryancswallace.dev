@@ -37,6 +37,7 @@ This site is a small portfolio, blog, and reference:
 
 - [GitHub](https://github.com/ryancswallace)
 - [LinkedIn](https://www.linkedin.com/in/ryancswallace/)
+- Resume: [PDF](https://ryancswallace.github.io/resume/resume.pdf) | [HTML](https://ryancswallace.github.io/resume/resume.html) | [.tex](https://ryancswallace.github.io/resume/resume.tex)
 - [Source code for this site](https://github.com/ryancswallace/ryancswallace.dev)
 
 ## Get In Touch

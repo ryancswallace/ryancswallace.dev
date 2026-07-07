@@ -59,6 +59,39 @@ const recentPosts = sortedPosts.filter(({ data }) => !data.featured);
             economics. This is where I collect projects, technical notes, and
             things I'm learning.
           </p>
+          <br />
+          <p>
+            Resume:
+            <a
+              target="_blank"
+              href="https://ryancswallace.github.io/resume/resume.pdf"
+              class="break-words text-foreground underline decoration-dashed underline-offset-4 hover:text-accent focus-visible:no-underline"
+              aria-label="PDF resume"
+              title="PDF Resume"
+            >
+              PDF</a
+            >
+            |
+            <a
+              target="_blank"
+              href="https://ryancswallace.github.io/resume/resume.html"
+              class="break-words text-foreground underline decoration-dashed underline-offset-4 hover:text-accent focus-visible:no-underline"
+              aria-label="HTML resume"
+              title="HTML Resume"
+            >
+              HTML</a
+            >
+            |
+            <a
+              target="_blank"
+              href="https://ryancswallace.github.io/resume/resume.tex"
+              class="break-words text-foreground underline decoration-dashed underline-offset-4 hover:text-accent focus-visible:no-underline"
+              aria-label="TeX resume"
+              title="TeX Resume"
+            >
+              TeX</a
+            >
+          </p>
           {
             // only display if at least one social link is enabled
             SOCIALS.length > 0 && (
