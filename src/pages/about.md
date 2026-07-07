@@ -7,36 +7,31 @@ description: "About Ryan Wallace, his work, and what he writes about."
 Hi, I'm Ryan.
 
 I build data systems and collaborate on research at the Federal Reserve Bank of
-Boston. This site is my home base for notes, projects, and technical writing.
+Boston. This site collects my notes, projects, and technical writing.
 
 ## Snapshot
 
 - **Location:** Boston, MA
 - **Background:** Computer Science and Statistics at Harvard; data science and
   engineering at the Federal Reserve
-- **Current work:** Data systems; research infrastructure; NLP in economics
-  research
-- **Interests:** AI/ML; distributed systems; databases; Linux; developer tooling
+- **Current work:** Data systems, research infrastructure, NLP in economics
+- **Interests:** AI/ML, distributed systems, databases, Linux, developer tooling
 
 ## What I Care About
 
-I'm drawn to software that makes complicated work feel steadier. A few themes
-show up often in my work:
+I like software that makes complex work easier to trust and maintain.
 
 - Building interfaces between research questions and production systems
-- Using AI and ML to answer empirical questions and to support practical
-  workflows
-- Designing tools and data pipelines that are easy to use and to reason about
+- Applying AI and ML to empirical questions
+- Designing tools and data pipelines that are easy to reason about
 
 ## This Site
 
-This site is a small portfolio, blog, and personal reference shelf.
-
-I use it to collect:
+This site is a small portfolio, blog, and reference:
 
 - Project notes and implementation details
 - Technical posts about systems, data, and development workflows
-- References for tools I use often
+- References for tools I use
 
 ## Elsewhere
 
