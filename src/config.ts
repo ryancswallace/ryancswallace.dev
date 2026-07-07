@@ -7,7 +7,7 @@ export const SITE = {
   ogImage: "rw_favicons/android-chrome-512x512.png",
   lightAndDarkMode: true,
   editPost: {
-    enabled: true,
+    enabled: false,
     text: "Edit page",
     url: "https://github.com/ryancswallace/ryancswallace.dev/",
   },
