@@ -2,7 +2,7 @@ export const SITE = {
   website: "https://ryancswallace.dev/",
   author: "Ryan Wallace",
   profile: "https://ryancswallace.dev/",
-  desc: "Personal portfolio site built with Astro.",
+  desc: "Ryan Wallace's personal portfolio, blog, and reference site.",
   title: "Ryan Wallace",
   ogImage: "rw_favicons/android-chrome-512x512.png",
   lightAndDarkMode: true,
