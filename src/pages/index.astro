@@ -63,45 +63,53 @@ const recentPosts = sortedPosts.filter(({ data }) => !data.featured);
           <p>
             Resume:
             <a
-              target="_blank"
-              download
               href="https://ryancswallace.github.io/resume/resume_ryan-wallace.pdf"
+              target="_blank"
+              download="resume_ryan-wallace.pdf"
               class="break-words text-foreground underline decoration-dashed underline-offset-4 hover:text-accent focus-visible:no-underline"
               aria-label="PDF resume"
               title="PDF Resume"
+              data-format="PDF"
+              data-download-resume
             >
               PDF</a
             >
             |
             <a
-              target="_blank"
-              download
               href="https://ryancswallace.github.io/resume/resume_ryan-wallace.rtf"
+              target="_blank"
+              download="resume_ryan-wallace.rtf"
               class="break-words text-foreground underline decoration-dashed underline-offset-4 hover:text-accent focus-visible:no-underline"
               aria-label="RTF resume"
               title="RTF Resume"
+              data-format="RTF"
+              data-download-resume
             >
               RTF</a
             >
             |
             <a
-              target="_blank"
-              download
               href="https://ryancswallace.github.io/resume/resume_ryan-wallace.md"
+              target="_blank"
+              download="resume_ryan-wallace.md"
               class="break-words text-foreground underline decoration-dashed underline-offset-4 hover:text-accent focus-visible:no-underline"
               aria-label="Markdown resume"
               title="Markdown Resume"
+              data-format="Markdown"
+              data-download-resume
             >
               Markdown</a
             >
             |
             <a
-              target="_blank"
-              download
               href="https://ryancswallace.github.io/resume/resume_ryan-wallace.tex"
+              target="_blank"
+              download="resume_ryan-wallace.tex"
               class="break-words text-foreground underline decoration-dashed underline-offset-4 hover:text-accent focus-visible:no-underline"
               aria-label="TeX resume"
               title="TeX Resume"
+              data-format="TeX"
+              data-download-resume
             >
               TeX</a
             >
@@ -167,5 +175,40 @@ const recentPosts = sortedPosts.filter(({ data }) => !data.featured);
     if (indexLayout) {
       sessionStorage.setItem("backUrl", "/");
     }
+
+    document
+      .querySelectorAll<HTMLAnchorElement>("[data-download-resume]")
+      .forEach(link => {
+        link.addEventListener("click", async event => {
+          event.preventDefault();
+
+          const fileUrl = link.href;
+          const fileName =
+            link.download || fileUrl.split("/").pop() || "resume";
+
+          try {
+            const response = await fetch(fileUrl);
+
+            if (!response.ok) {
+              throw new Error(`Unable to download ${fileUrl}`);
+            }
+
+            const fileBlob = await response.blob();
+            const downloadUrl = URL.createObjectURL(fileBlob);
+            const downloadLink = document.createElement("a");
+
+            downloadLink.href = downloadUrl;
+            downloadLink.download = fileName;
+            downloadLink.style.display = "none";
+
+            document.body.append(downloadLink);
+            downloadLink.click();
+            downloadLink.remove();
+            URL.revokeObjectURL(downloadUrl);
+          } catch {
+            window.open(fileUrl, "_blank", "noopener");
+          }
+        });
+      });
   });
 </script>

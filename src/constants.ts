@@ -1,4 +1,5 @@
 import IconFacebook from "@/assets/icons/IconFacebook.svg";
+import IconResume from "@/assets/icons/IconResume.svg";
 import IconGitHub from "@/assets/icons/IconGitHub.svg";
 import IconLinkedin from "@/assets/icons/IconLinkedin.svg";
 import IconMail from "@/assets/icons/IconMail.svg";
@@ -16,6 +17,12 @@ interface Social {
 }
 
 export const SOCIALS: Social[] = [
+  {
+    name: "Resume",
+    href: "https://ryancswallace.github.io/resume",
+    linkTitle: `${SITE.title}'s Resume`,
+    icon: IconResume,
+  },
   {
     name: "GitHub",
     href: "https://github.com/ryancswallace",
