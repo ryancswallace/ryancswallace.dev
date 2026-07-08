@@ -1,6 +1,15 @@
 {
-  "recommendations": [
-    "astro-build.astro-vscode"
-  ],
-  "unwantedRecommendations": []
+    "recommendations": [
+        "astro-build.astro-vscode",
+        "davidanson.vscode-markdownlint",
+        "github.vscode-github-actions",
+        "github.vscode-pull-request-github",
+        "mikestead.dotenv",
+        "ms-azuretools.vscode-containers",
+        "ms-vscode.makefile-tools",
+        "redhat.vscode-yaml",
+        "streetsidesoftware.code-spell-checker",
+        "vivaxy.vscode-conventional-commits"
+    ],
+    "unwantedRecommendations": []
 }
