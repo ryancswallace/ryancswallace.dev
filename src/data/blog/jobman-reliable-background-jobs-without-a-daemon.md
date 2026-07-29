@@ -32,6 +32,14 @@ Jobman provides:
 
 There is no shared Jobman daemon. Completed jobs leave no supervisor or other processes running.
 
+<figure>
+  <video controls muted playsinline autoplay loop preload="metadata">
+    <source src="/videos/jobman-basic-cli.webm" type="video/webm" />
+    <a href="/videos/jobman-basic-cli.gif">View the GIF version</a>
+  </video>
+  <figcaption>Basic Jobman command line behavior.</figcaption>
+</figure>
+
 ## A small pipeline
 
 Consider a two-step workflow:

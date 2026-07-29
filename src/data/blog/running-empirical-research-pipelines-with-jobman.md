@@ -442,6 +442,16 @@ Note that Jobman jobs:
 
 For many research workflows, this is the useful middle ground: more reliable and feature-rich than unmanaged background processes, but substantially simpler than a heavy-weight scheduler.
 
+## Basic use demo
+
+<figure>
+  <video controls muted playsinline autoplay loop preload="metadata">
+    <source src="/videos/jobman-basic-cli.webm" type="video/webm" />
+    <a href="/videos/jobman-basic-cli.gif">View the GIF version</a>
+  </video>
+  <figcaption>Basic Jobman command line behavior.</figcaption>
+</figure>
+
 <script type="module">
   import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
 
