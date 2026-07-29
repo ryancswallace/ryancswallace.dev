@@ -14,6 +14,16 @@ tags:
 description: A practical guide to running reliable research pipelines with Jobman using dependencies, retries, timeouts, concurrency limits, durable logs, and notifications.
 ---
 
+<div
+  class="not-prose mx-auto mb-8 flex max-w-xl justify-center rounded-xl bg-slate-950 px-6 py-5"
+>
+  <img
+    class="h-auto w-full max-w-md !border-0"
+    src="/images/jobman-logo-dark-transparent.svg"
+    alt="Jobman"
+  />
+</div>
+
 # Running Empirical Research Pipelines with Jobman
 
 <div class="grid gap-4 sm:grid-cols-[minmax(0,1fr)_16rem] sm:items-start">
@@ -72,7 +82,7 @@ flowchart LR
 
 Each stage should start only after its inputs are ready. A failure should stop dependent work rather than produce results from stale files.
 
-Submit the first two jobs:
+Jobman makes running these inter-dependent jobs easy. Submit the first two jobs:
 
 ```console
 $ fetch=$(jobman run --name fetch -- python fetch.py)
