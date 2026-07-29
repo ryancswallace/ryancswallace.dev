@@ -16,8 +16,6 @@ tags:
 description: Python Project Foundry generates production-ready Python repositories with testing, documentation, security, CI, containers, and releases built in.
 ---
 
-# Python Project Foundry: A Production-Ready Repository in One Command
-
 <div class="grid gap-4 sm:grid-cols-[minmax(0,1fr)_16rem] sm:items-start">
   <div>
     <p class="mt-0">
