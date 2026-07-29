@@ -23,10 +23,16 @@ Starting a new Python library is quick and easy, but creating the surrounding re
 [Python Project Foundry](https://github.com/ryancswallace/python-project-foundry) generates an opinionated, production-ready repository for a Python package or library from an interactive questionnaire.
 
 ```console
-uvx python-project-foundry ./my-package
+uvx python-project-foundry ./my/new/project
 ```
 
-Answer a few questions, then start developing.
+<figure>
+  <video controls muted playsinline autoplay loop preload="metadata">
+    <source src="/videos/ppf-basic-cli.webm" type="video/webm" />
+    <a href="/videos/ppf-basic-cli.gif">View the GIF version</a>
+  </video>
+  <figcaption>Basic project scaffolding with Python Project Foundry.</figcaption>
+</figure>
 
 ## What Foundry generates
 
