@@ -36,14 +36,14 @@ There is no shared Jobman daemon. Completed jobs leave no supervisor running.
 
 Consider a two-step local workflow:
 
-```mermaid
+<div class="mermaid">
 flowchart LR
     A["Prepare input"] -->|"success"| B["Analyze input"]
     B -->|"exit 1"| C{"Retries left?"}
     C -->|"yes"| B
     C -->|"no"| D["Fail job"]
     B -->|"exit 0"| E["Complete"]
-```
+</div>
 
 The requirements are modest:
 
@@ -161,7 +161,7 @@ Once the submitting CLI exits, some component must still:
 
 Jobman assigns that responsibility to one supervisor per job:
 
-```mermaid
+<div class="mermaid">
 sequenceDiagram
     participant CLI as "Submitting CLI"
     participant DB as "Local store"
@@ -177,7 +177,8 @@ sequenceDiagram
     T-->>S: Output and exit status
     S->>DB: Commit run and job results
     S-->>S: Exit
-```
+
+</div>
 
 The supervisor is another invocation of the Jobman executable in a private mode. It owns one job and terminates after the job and its bounded completion work finish.
 
@@ -195,7 +196,7 @@ It does not eliminate coordination. Supervisors and CLI commands still contend o
 
 Jobman uses two storage mechanisms because metadata and logs have different workloads.
 
-```mermaid
+<div class="mermaid">
 flowchart TB
     J["Jobman commands and supervisors"] --> DB["SQLite metadata"]
     J --> FS["Private log files"]
@@ -204,7 +205,8 @@ flowchart TB
     FS --> O["stdout"]
     FS --> E["stderr"]
     FS --> I["Chunk ordering index"]
-```
+
+</div>
 
 SQLite is a good fit for:
 
@@ -270,3 +272,14 @@ The command-line surface is the least complicated part of Jobman. The more inter
 - testing failures at the boundary between durable intent and external effects.
 
 Those are the topics I'll cover in the rest of this series.
+
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: document.documentElement.dataset.theme === "dark" ? "dark" : "default",
+  });
+
+  await mermaid.run({ querySelector: ".mermaid" });
+</script>
