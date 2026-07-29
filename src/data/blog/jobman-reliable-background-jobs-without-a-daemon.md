@@ -167,7 +167,6 @@ sequenceDiagram
     participant DB as "Local store"
     participant S as "Per-job supervisor"
     participant T as "Target process"
-
     CLI->>DB: Create submitting job
     CLI->>S: Launch with one-time credential
     S->>DB: Atomically claim job
@@ -177,7 +176,6 @@ sequenceDiagram
     T-->>S: Output and exit status
     S->>DB: Commit run and job results
     S-->>S: Exit
-
 </div>
 
 The supervisor is another invocation of the Jobman executable in a private mode. It owns one job and terminates after the job and its bounded completion work finish.
@@ -200,12 +198,10 @@ Jobman uses two storage mechanisms because metadata and logs have different work
 flowchart TB
     J["Jobman commands and supervisors"] --> DB["SQLite metadata"]
     J --> FS["Private log files"]
-
     DB --> M["Jobs, runs, events, leases, policy"]
     FS --> O["stdout"]
     FS --> E["stderr"]
     FS --> I["Chunk ordering index"]
-
 </div>
 
 SQLite is a good fit for:
