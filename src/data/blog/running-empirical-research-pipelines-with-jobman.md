@@ -80,7 +80,7 @@ flowchart LR
 
 Each stage should start only after its inputs are ready. A failure should stop dependent work rather than produce results from stale files.
 
-Jobman makes running these inter-dependent jobs easy. Submit the first two jobs:
+Jobman makes running these interdependent jobs easy. Submit the first two jobs:
 
 ```console
 $ fetch=$(jobman run --name fetch -- python fetch.py)
