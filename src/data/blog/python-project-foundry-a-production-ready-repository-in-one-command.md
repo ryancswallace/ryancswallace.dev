@@ -20,7 +20,7 @@ description: Python Project Foundry generates production-ready Python repositori
 
 Starting a new Python library is quick and easy, but creating the surrounding repository--testing, documentation, CI, security checks, packaging, releases, and containers--takes considerably longer.
 
-[Python Project Foundry](https://github.com/ryancswallace/python-project-foundry) generates an opinionated, production-ready repository for a Python package or library from an interactive questionnaire.
+**[Python Project Foundry](https://github.com/ryancswallace/python-project-foundry)** generates an opinionated, production-ready repository for a Python package or library from an interactive questionnaire.
 
 ```console
 uvx python-project-foundry ./my/new/project

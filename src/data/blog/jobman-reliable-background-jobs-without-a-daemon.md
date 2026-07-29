@@ -16,7 +16,7 @@ description: A technical introduction to Jobman's architecture through a real wo
 
 # Jobman: Reliable Background Jobs Without a Daemon
 
-[Jobman](https://github.com/ryancswallace/jobman) is a daemonless job manager for local background processes. I wrote it for work that has outgrown `nohup` and ad hoc shell scripts but does not justify a full-fledged service or distributed scheduler.
+**[Jobman](https://github.com/ryancswallace/jobman)** is a daemonless job manager for local background processes. I wrote it for work that has outgrown `nohup` and ad hoc shell scripts but does not justify a full-fledged service or distributed scheduler.
 
 Jobman provides:
 

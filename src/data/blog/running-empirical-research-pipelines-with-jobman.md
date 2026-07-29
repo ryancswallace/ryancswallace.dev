@@ -23,7 +23,7 @@ Empirical research often involves long-running work on a local workstation or re
 - producing tables and figures;
 - repeating specifications across samples and outcomes.
 
-[Jobman](https://github.com/ryancswallace/jobman) runs these tasks durably in the background while adding support for inter-task dependencies, retries, timeouts, logs, concurrency limits, and notifications. It combines the benefits of `nohup` and terminal job control with the features of more heavy-weight schedulers.
+**[Jobman](https://github.com/ryancswallace/jobman)** runs these tasks durably in the background while adding support for inter-task dependencies, retries, timeouts, logs, concurrency limits, and notifications. It combines the benefits of `nohup` and terminal job control with the features of more heavy-weight schedulers.
 
 ## A typical research pipeline
 
