@@ -127,7 +127,7 @@ $ jobman logs --all model
 
 This is particularly useful for software that reports diagnostics like convergence warnings, dropped observations, or failed specifications on stderr.
 
-Raw target output is recorded to disk and is *not* automatically redacted. Don't print credentials or confidential data to logs.
+Raw target output is recorded to disk and is _not_ automatically redacted. Don't print credentials or confidential data to logs.
 
 ## Retry transient failures
 
@@ -146,12 +146,12 @@ A script can use distinct exit codes to separate transient failures from invalid
 
 This allows you to customize the retry policy based on the type of failure encountered:
 
-| Outcome                     | Suggested treatment  |
-| --------------------------- | -------------------- |
-| Temporary network failure   | Retry                |
-| Rate limit                  | Retry with backoff   |
-| Invalid program state       | Fail immediately     |
-| Run timeout                 | Retry only when safe |
+| Outcome                   | Suggested treatment  |
+| ------------------------- | -------------------- |
+| Temporary network failure | Retry                |
+| Rate limit                | Retry with backoff   |
+| Invalid program state     | Fail immediately     |
+| Run timeout               | Retry only when safe |
 
 ## Bound execution time
 
@@ -295,7 +295,7 @@ Remove an inherited value:
 $ jobman run --unset-env DEBUG -- python model.py
 ```
 
-Note that Jobman executes the specified target program directly. It does *not* interpret shell operators unless you explicitly run a shell:
+Note that Jobman executes the specified target program directly. It does _not_ interpret shell operators unless you explicitly run a shell:
 
 ```console
 $ jobman run -- sh -c 'python model.py > summary.txt'
@@ -436,9 +436,9 @@ Jobman is designed for single-user work on one machine.
 
 Note that Jobman jobs:
 
-- *will* survive a closed terminal or SSH connection;
-- *may* end when the operating system user session ends, depending on host configuration;
-- will *not* survive host shutdown or reboot.
+- _will_ survive a closed terminal or SSH connection;
+- _may_ end when the operating system user session ends, depending on host configuration;
+- will _not_ survive host shutdown or reboot.
 
 For many research workflows, this is the useful middle ground: more reliable and feature-rich than unmanaged background processes, but substantially simpler than a heavy-weight scheduler.
 
