@@ -56,7 +56,7 @@ description: A practical guide to running reliable research pipelines with Jobma
   </aside>
 </div>
 
-**[Jobman](https://github.com/ryancswallace/jobman)** runs these tasks durably in the background while adding support for inter-task dependencies, retries, timeouts, logs, concurrency limits, and notifications. It combines the benefits of `nohup` and terminal job control with the features of more heavy-weight schedulers.
+Jobman runs these tasks durably in the background while adding support for inter-task dependencies, retries, timeouts, logs, concurrency limits, and notifications. It combines the benefits of `nohup` and terminal job control with the features of more heavy-weight schedulers.
 
 ## A typical research pipeline
 

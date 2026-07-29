@@ -26,14 +26,9 @@ description: Python Project Foundry generates production-ready Python repositori
       packaging, releases, and containers--takes considerably longer.
     </p>
     <p class="mb-0">
-      <strong
-        ><a
-          href="https://github.com/ryancswallace/python-project-foundry"
-          >Python Project Foundry</a
-        ></strong
-      >
-      generates an opinionated, production-ready repository for a Python
-      package or library from an interactive questionnaire.
+      Python Project Foundry generates an opinionated, production-ready
+      repository for a Python package or library from an interactive
+      questionnaire.
     </p>
   </div>
   <aside class="not-prose rounded-lg border border-border bg-muted/40 p-4">
