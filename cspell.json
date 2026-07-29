@@ -22,6 +22,7 @@
         "daemonless",
         "davidanson",
         "dbaeumer",
+        "deptry",
         "esbenp",
         "favicons",
         "frontmatter",
@@ -34,11 +35,13 @@
         "nohup",
         "pagefind",
         "processless",
+        "pytest",
         "Rscript",
         "ryancswallace",
         "seccomp",
         "Stata",
         "vivaxy",
-        "withastro"
+        "withastro",
+        "Zizmor"
     ]
 }

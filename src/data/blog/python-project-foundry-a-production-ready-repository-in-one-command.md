@@ -18,9 +18,9 @@ description: Python Project Foundry generates production-ready Python repositori
 
 # Python Project Foundry: A Production-Ready Repository in One Command
 
-Starting a Python library is easy. Creating the surrounding repository—testing, documentation, CI, security checks, packaging, releases, and containers—takes considerably longer.
+Starting a new Python library is quick and easy, but creating the surrounding repository--testing, documentation, CI, security checks, packaging, releases, and containers--takes considerably longer.
 
-[Python Project Foundry](https://github.com/ryancswallace/python-project-foundry) generates an opinionated, production-ready Python package or library repository from an interactive questionnaire.
+[Python Project Foundry](https://github.com/ryancswallace/python-project-foundry) generates an opinionated, production-ready repository for a Python package or library from an interactive questionnaire.
 
 ```console
 uvx python-project-foundry ./my-package
@@ -30,7 +30,7 @@ Answer a few questions, then start developing.
 
 ## What Foundry generates
 
-Foundry creates more than a Python package skeleton:
+Foundry creates more than just a Python package skeleton:
 
 ```text
 Questionnaire
@@ -51,7 +51,7 @@ The result is a repository with a consistent interface for local development and
 
 ## Quick start
 
-You need `uv`, Git, Make, Node.js, and npm.
+The requirements to use the single-line invocation method below are `uv`, Git, Make, Node.js, and npm.
 
 Generate a repository:
 
@@ -79,7 +79,14 @@ make check
 
 On Linux and macOS, Foundry can also initialize Git, install dependencies, create the initial commit, and install Git hooks.
 
-## Sensible Python packaging defaults
+Alternatively, if you don't have `uv` installed, you can use the bootstrap script method to scaffold a new project:
+
+```console
+curl -LsSf https://raw.githubusercontent.com/ryancswallace/python-project-foundry/main/ppf |
+  sh -s -- ./orbit-tools
+```
+
+## Modern Python packaging defaults
 
 Generated repositories use a modern `src/` layout:
 
@@ -124,7 +131,7 @@ Common commands include:
 | Build distributions       | `make build`        |
 | Test containers           | `make docker-check` |
 
-This keeps local development and CI aligned. Contributors don't need to memorize every underlying tool invocation.
+This keeps local development and CI aligned. Developers don't need to memorize every underlying tool invocation.
 
 ## Testing and quality controls
 
@@ -141,7 +148,7 @@ Generated projects combine several complementary tools:
 | Workflows               | actionlint, Zizmor             |
 | Automation matrix       | Nox                            |
 
-Coverage enforcement is configurable during generation.
+Test coverage enforcement is configurable during generation.
 
 The Linux CI matrix tests every selected Python version from the minimum through the default. macOS and Windows test the default version.
 
@@ -164,7 +171,7 @@ Preview it locally:
 make serve-docs
 ```
 
-The documentation configuration uses the repository and package metadata supplied during generation.
+The docs configuration uses the repository and package metadata supplied during generation.
 
 ## Security and supply-chain checks
 
@@ -181,7 +188,7 @@ Security tooling is present from the first commit:
 - CycloneDX SBOM generation
 - Artifact attestations
 
-These checks do not guarantee security, but they establish a strong baseline that is often deferred until much later.
+These checks establish strong security baseline from the initial stages of development.
 
 ## Container support
 
@@ -223,7 +230,7 @@ Foundry can generate:
 
 The selected value is used consistently in the license file, package metadata, citation metadata, README, and container labels.
 
-The proprietary option provides a general all-rights-reserved notice. Organizations should have it reviewed for their specific requirements.
+The proprietary option provides a general all-rights-reserved notice.
 
 ## GitHub publishing is explicit
 
@@ -244,7 +251,7 @@ uvx python-project-foundry publish \
   --visibility private
 ```
 
-The command:
+The `publish` command:
 
 - Reads the configured GitHub destination
 - Validates the local Git repository
@@ -257,8 +264,6 @@ Visibility must be selected explicitly:
 - `private`
 - `public`
 - `internal`
-
-This separation keeps local scaffolding safe and predictable.
 
 ## Template updates
 
@@ -285,11 +290,11 @@ git diff
 make check
 ```
 
-Updates are pinned to the installed Foundry release rather than selecting an unbounded template version.
+Updates are pinned to the installed Foundry release rather than selecting the latest template version.
 
 ## Automation-friendly generation
 
-Interactive prompts are convenient for a first project, but generation can also be unattended:
+Interactive prompts are typically most convenient, but generation can also be unattended:
 
 ```console
 uvx python-project-foundry ./orbit-tools --defaults
@@ -304,13 +309,7 @@ Useful options include:
 | `--skip-tasks` | Render files without setup tasks   |
 | `--overwrite`  | Replace existing destination files |
 
-Check the installed version with:
-
-```console
-ppf --version
-```
-
-## A strong starting point
+## When to use Foundry
 
 Python Project Foundry is useful when you want a package repository with mature engineering practices from its first commit.
 
@@ -326,4 +325,4 @@ It provides:
 - Explicit GitHub publishing
 - Template updates
 
-The generated repository remains ordinary Python, Markdown, YAML, TOML, and Make. Foundry supplies the starting structure; the resulting project is yours to evolve.
+Foundry quickly creates strong repo scaffolding so you can focus on developing your Python application itself.
