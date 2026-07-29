@@ -18,13 +18,12 @@ description: A practical guide to running reliable research pipelines with Jobma
 
 Empirical research often involves long-running work on a local workstation or remote server:
 
-- cleaning administrative or survey data;
-- fitting models in any language (R, Python, Stata, Julia);
-- running bootstrap or simulation jobs;
+- cleaning data;
+- fitting models or running simulations;
 - producing tables and figures;
 - repeating specifications across samples and outcomes.
 
-[Jobman](https://github.com/ryancswallace/jobman) runs these tasks in the background while adding dependencies, retries, timeouts, logs, concurrency limits, and notifications. It is useful when a shell script feels fragile but a cluster scheduler would be excessive.
+[Jobman](https://github.com/ryancswallace/jobman) runs these tasks durably in the background while adding support for inter-task dependencies, retries, timeouts, logs, concurrency limits, and notifications. It combines the benefits of `nohup` and terminal job control with the features of more heavy-weight schedulers.
 
 ## A typical research pipeline
 
@@ -47,25 +46,26 @@ $ fetch=$(jobman run --name fetch -- python fetch.py)
 $ clean=$(jobman run --name clean --after-success "$fetch" -- Rscript clean.R)
 ```
 
+(The `jobman run` command returns immediately and prints the unique job ID of the newly created job to stdout, so the variables `$fetch`, `$clean`, etc. contain job IDs.)
+
 Submit the estimation job:
 
 ```console
-$ models=$(jobman run --name models \
-    --after-success "$clean" -- python models.py)
+$ model=$(jobman run --name model --after-success "$clean" -- stata -b do model)
 ```
 
-Finally, submit the outputs:
+Finally, submit the output creation jobs:
 
 ```console
-$ jobman run --name tables --after-success "$models" -- Rscript tables.R
-$ jobman run --name figures --after-success "$models" -- python figures.py
+$ jobman run --after-success "$model" -- Rscript tables.R
+$ jobman run --after-success "$model" -- python figures.py
 ```
 
 Jobman records the dependency graph when each job is submitted. You can close the terminal while the pipeline runs.
 
 ## Check progress
 
-Use `list` for an overview:
+Use `list` for an overview of the **status** of all (active) jobs:
 
 ```console
 $ jobman list --active
@@ -74,18 +74,16 @@ $ jobman list --active
 Use `status` for one job:
 
 ```console
-$ jobman status models
+$ jobman status model
 ```
 
-Use `show` for its specification and run history:
+Use `show` for **job specifications** and the job's **run history**:
 
 ```console
-$ jobman show models
+$ jobman show model
 ```
 
-Names are convenient for interactive use. In scripts, retain the full ID returned by `jobman run`.
-
-| Command      | Best use                       |
+| Subcommand   | Best use                       |
 | ------------ | ------------------------------ |
 | `list`       | Review several jobs            |
 | `status JOB` | Check one current result       |
@@ -95,39 +93,45 @@ Names are convenient for interactive use. In scripts, retain the full ID returne
 
 ## Keep logs after disconnecting
 
-Jobman captures stdout and stderr independently.
+Jobman captures **stdout and stderr logs** independently.
 
-Follow a running estimation:
+Show all logs (stdout and stderr) for a job:
 
 ```console
-$ jobman logs --follow models
+$ jobman logs model
 ```
 
-Inspect warnings:
+Follow logs for a running job:
 
 ```console
-$ jobman logs --stream stderr models
+$ jobman logs --follow model
+```
+
+Inspect warnings (stderr only):
+
+```console
+$ jobman logs --stream stderr model
 ```
 
 Read only the last 50 lines:
 
 ```console
-$ jobman logs --lines 50 models
+$ jobman logs --lines 50 model
 ```
 
-For a job with several attempts:
+Show logs across all runs for a job with several attempts:
 
 ```console
-$ jobman logs --all models
+$ jobman logs --all model
 ```
 
-This is particularly useful for software that reports convergence warnings, dropped observations, or failed specifications on stderr.
+This is particularly useful for software that reports diagnostics like convergence warnings, dropped observations, or failed specifications on stderr.
 
-Raw target output is not automatically redacted. Do not print credentials or confidential data into logs.
+Raw target output is recorded to disk and is *not* automatically redacted. Don't print credentials or confidential data to logs.
 
 ## Retry transient failures
 
-Downloads, APIs, database connections, and licensed software can fail temporarily. A bounded retry policy handles those cases without hiding permanent errors.
+Downloads, APIs, database connections, and licensed software can fail temporarily. A bounded **retry policy** handles those cases without suppressing permanent errors.
 
 ```console
 $ jobman run --name download \
@@ -138,33 +142,32 @@ $ jobman run --name download \
 
 `--retries 3` permits four attempts in total: the initial run and three retries.
 
-Only failures you classify as retryable trigger another attempt. This distinction matters:
+A script can use distinct exit codes to separate transient failures from invalid inputs. Only failures (i.e., exit codes) you classify as retryable trigger another attempt.
+
+This allows you to customize the retry policy based on the type of failure encountered:
 
 | Outcome                     | Suggested treatment  |
 | --------------------------- | -------------------- |
 | Temporary network failure   | Retry                |
 | Rate limit                  | Retry with backoff   |
-| Invalid model specification | Fail immediately     |
-| Missing required variable   | Fail immediately     |
+| Invalid program state       | Fail immediately     |
 | Run timeout                 | Retry only when safe |
-
-A script can use distinct exit codes to separate transient failures from invalid inputs.
 
 ## Bound execution time
 
-Use a run timeout to stop one attempt:
+Use a **run timeout** to stop one attempt:
 
 ```console
 $ jobman run --run-timeout 2h -- python bootstrap.py
 ```
 
-Use a job timeout to bound the entire lifecycle, including waiting and retries:
+Use a **job timeout** to bound the entire lifecycle, including waiting and retries:
 
 ```console
 $ jobman run --job-timeout 8h -- python bootstrap.py
 ```
 
-They can be combined:
+Run timeouts and job timeouts can be combined:
 
 ```console
 $ jobman run --run-timeout 2h --job-timeout 6h \
@@ -176,7 +179,7 @@ $ jobman run --run-timeout 2h --job-timeout 6h \
 | `--run-timeout` | One execution attempt                                 |
 | `--job-timeout` | Dependencies, queueing, delays, attempts, and retries |
 
-Timeouts are useful protection against stalled optimizers, dead network mounts, and simulations with pathological parameter draws.
+Timeouts are useful protection against stalled optimizers, infinite loops, inaccessible network resources, and simulations with pathological parameters.
 
 ## Limit concurrent work
 
@@ -202,7 +205,7 @@ $ jobman run --pool models -- python model_b.py
 A memory-intensive job can request several slots:
 
 ```console
-$ jobman run --pool models --slots 2 -- Rscript bayesian_model.R
+$ jobman run --pool models --slots 2 -- stata -b do simulation_a
 ```
 
 Waiting jobs do not consume slots before their dependencies and wait conditions are satisfied.
@@ -210,19 +213,21 @@ Waiting jobs do not consume slots before their dependencies and wait conditions 
 Pools are useful for:
 
 - limiting simultaneous database queries;
-- preventing model runs from exhausting RAM;
+- preventing runs from exhausting RAM;
 - restricting calls to rate-limited services;
 - reserving capacity for different workload classes.
 
 ## Wait for data to arrive
 
-A job can wait for a file:
+A job can **wait** for various conditions before starting.
+
+To wait for a file:
 
 ```console
 $ jobman run --wait-file data/raw/complete.flag -- python clean.py
 ```
 
-It can also wait until a specified time:
+To wait until a specified time:
 
 ```console
 $ jobman run --wait-until 2026-08-01T02:00:00Z -- python import.py
@@ -241,25 +246,24 @@ $ jobman run --wait-file data/ready \
     --wait-abort-at 2026-08-01T12:00:00Z -- python estimate.py
 ```
 
-A file wait observes whether the path exists. The target should still validate the file before using it.
-
 ## Organize related jobs
 
-Attach groups and tags when submitting work:
+Attach **groups and tags** when submitting work:
 
 ```console
-$ jobman run --group paper --tag baseline -- python model.py
+$ jobman run --group paper_a --tag baseline -- python model.py
 ```
 
 Filter the job list by group:
 
 ```console
-$ jobman list --group paper
+$ jobman list --group paper_a
 ```
 
 Possible research-oriented groups include:
 
 - `paper`;
+- `policy`;
 - `replication`;
 - `robustness`;
 - `simulation`;
@@ -270,6 +274,8 @@ Tags can record characteristics such as `baseline`, `placebo`, `restricted-sampl
 Job names are labels, not unique identifiers. Reusing a name does not overwrite an earlier job.
 
 ## Set the working environment explicitly
+
+The `run` subcommand supports multiple options for configuring the execution environment differently from the parent shell.
 
 Set the working directory:
 
@@ -289,7 +295,7 @@ Remove an inherited value:
 $ jobman run --unset-env DEBUG -- python model.py
 ```
 
-Jobman executes the target directly. It does not interpret shell operators unless you explicitly run a shell:
+Note that Jobman executes the specified target program directly. It does *not* interpret shell operators unless you explicitly run a shell:
 
 ```console
 $ jobman run -- sh -c 'python model.py > summary.txt'
@@ -299,22 +305,21 @@ Prefer direct execution when shell syntax is unnecessary.
 
 ## Repeat a specification
 
-Rerun a prior job without reconstructing its options:
+**Rerun** a prior job without reconstructing its options:
 
 ```console
 $ jobman rerun models --name models-rerun
 ```
 
-The new job receives a copy of the earlier effective specification and gets its own identity and history.
+The new job receives a copy of the earlier job's specification and gets its own identity and history.
 
 For repeated sampling or simulations, define explicit completion limits:
 
 ```console
-$ jobman run --max-runs 100 --success-target 100 \
-    -- python simulate_once.py
+$ jobman run --max-runs 100 --success-target 100 -- python simulate_once.py
 ```
 
-You can also tolerate a bounded number of failed draws:
+Jobman can also tolerate a bounded number of failed draws:
 
 ```console
 $ jobman run --max-runs 110 --success-target 100 \
@@ -325,28 +330,35 @@ This is useful when each execution produces one independent result that can be a
 
 ## Control active work
 
-Jobman provides several lifecycle commands:
+Jobman provides several **lifecycle commands**:
+
+Pause and resume are useful when interactive work temporarily needs the machine’s resources:
 
 ```console
 $ jobman pause models
 $ jobman resume models
-$ jobman cancel models
-$ jobman wait models
 ```
 
-Pause and resume are useful when interactive work temporarily needs the machine’s resources. Platform support differs, so check `jobman doctor` on the host where jobs will run.
-
 Cancellation applies to the managed process tree, not only the initial process. Jobman first requests a graceful stop and can force termination after the configured grace period.
+
+```console
+$ jobman cancel models
+```
+
+Waiting on a job blocks until the job completes:
+
+```console
+$ jobman wait models
+```
 
 ## Receive completion notifications
 
 Jobman supports configured command callbacks, HTTPS webhooks, and SMTP notifications.
 
-Once a notifier named `research` is configured:
+For example, if a notifier named `research` is configured, this invocation sends a message to that notification channel if the job fails:
 
 ```console
-$ jobman run --notify research \
-    --notify-on job_failed -- python models.py
+$ jobman run --notify research --notify-on job_failed -- python models.py
 ```
 
 Useful events include:
@@ -357,11 +369,11 @@ Useful events include:
 - retry scheduled;
 - run started or completed.
 
-Notifications are especially useful for overnight estimates and remote sessions. Store credentials as configured secret references rather than literal command-line values.
+Notifications are especially useful for jobs running outside work hours and for remote sessions.
 
 ## Use stable output in scripts
 
-Human-readable output is intended for terminals. Use JSON for automation:
+Human-readable output is intended for terminals. Use **machine-readable JSON** for automation:
 
 ```console
 $ jobman status --json models
@@ -369,7 +381,7 @@ $ jobman show --json models
 $ jobman list --json --group paper
 ```
 
-This makes it easier to build project dashboards, generate run manifests, or record job outcomes alongside research artifacts.
+This makes it easier to generate run manifests or record job outcomes alongside research artifacts.
 
 For reproducibility, retain:
 
@@ -384,7 +396,7 @@ Jobman records execution history, but it does not replace source control, data v
 
 ## Keep state manageable
 
-Preview cleanup before deleting anything:
+Preview history **cleanup** before deleting anything:
 
 ```console
 $ jobman clean --older-than 30d
@@ -412,19 +424,23 @@ Do not delete files inside the Jobman state directory by hand. Jobman avoids rem
 
 ## Where Jobman fits
 
-Jobman is designed for local, per-user work on one machine.
+Jobman is designed for single-user work on one machine.
 
-| Good fit                         | Use another system                        |
-| -------------------------------- | ----------------------------------------- |
-| Workstation or research server   | Multi-node computation                    |
-| Jobs submitted over SSH          | Cluster-wide scheduling                   |
-| Local data pipelines             | Distributed data processing               |
-| Parallel robustness checks       | Resource placement across hosts           |
-| Overnight models and simulations | Work requiring a permanent system service |
+| Good fit                           | Use another system                        |
+| ---------------------------------- | ----------------------------------------- |
+| Workstation, server, cloud compute | Multi-node computation                    |
+| Jobs submitted over SSH            | Cluster-wide scheduling                   |
+| Local data pipelines               | Distributed data processing               |
+| Parallel robustness checks         | Resource placement across hosts           |
+| Overnight models and simulations   | Work requiring a permanent system service |
 
-Jobs can survive a closed terminal or SSH connection. They may end when the operating-system user session ends, depending on the host configuration.
+Note that Jobman jobs:
 
-For many empirical workflows, that is the useful middle ground: more reliable than unmanaged background processes, but substantially simpler than operating a scheduler.
+- *will* survive a closed terminal or SSH connection;
+- *may* end when the operating system user session ends, depending on host configuration;
+- will *not* survive host shutdown or reboot.
+
+For many research workflows, this is the useful middle ground: more reliable and feature-rich than unmanaged background processes, but substantially simpler than a heavy-weight scheduler.
 
 <script type="module">
   import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
