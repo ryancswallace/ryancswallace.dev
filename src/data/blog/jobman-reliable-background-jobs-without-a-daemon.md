@@ -11,8 +11,7 @@ tags:
   - go
   - systems-programming
   - cli
-description:
-  A technical introduction to Jobman's architecture through a real workflow with dependencies, retries, durable state, and logs.
+description: A technical introduction to Jobman's architecture through a real workflow with dependencies, retries, durable state, and logs.
 ---
 
 # Jobman: Reliable Background Jobs Without a Daemon
@@ -21,15 +20,15 @@ Jobman is a daemonless job manager for local background processes. I wrote it fo
 
 It provides:
 
-| Concern | Jobman's approach |
-| --- | --- |
-| Detached execution | One short-lived supervisor per job |
-| Durable state | Transactional metadata in SQLite |
-| Output | Separate stdout and stderr files with an ordering index |
-| Reliability | Retries, backoff, delays, and timeouts |
-| Coordination | Dependencies and local concurrency limits |
-| Lifecycle control | Status, wait, pause, resume, cancel, and rerun |
-| Automation | Versioned JSON and stable exit behavior |
+| Concern            | Jobman's approach                                       |
+| ------------------ | ------------------------------------------------------- |
+| Detached execution | One short-lived supervisor per job                      |
+| Durable state      | Transactional metadata in SQLite                        |
+| Output             | Separate stdout and stderr files with an ordering index |
+| Reliability        | Retries, backoff, delays, and timeouts                  |
+| Coordination       | Dependencies and local concurrency limits               |
+| Lifecycle control  | Status, wait, pause, resume, cancel, and rerun          |
+| Automation         | Versioned JSON and stable exit behavior                 |
 
 There is no shared Jobman daemon. Completed jobs leave no supervisor running.
 
@@ -97,11 +96,11 @@ $ analyze_id=$(jobman run --name analyze \
 
 This specification records three policy decisions:
 
-| Option | Meaning |
-| --- | --- |
-| `--after-success "$prepare_id"` | Start only after preparation succeeds |
-| `--retryable-exit-code 1` | Treat exit status 1 as transient |
-| `--retries 2 --retry-delay 1s` | Permit two additional attempts, separated by one second |
+| Option                          | Meaning                                                 |
+| ------------------------------- | ------------------------------------------------------- |
+| `--after-success "$prepare_id"` | Start only after preparation succeeds                   |
+| `--retryable-exit-code 1`       | Treat exit status 1 as transient                        |
+| `--retries 2 --retry-delay 1s`  | Permit two additional attempts, separated by one second |
 
 The policy is stored before the background supervisor begins evaluating it. A later CLI invocation does not have to reconstruct the pipeline from shell history.
 
@@ -246,14 +245,14 @@ This preserves argument boundaries by default. It also avoids making quoting rul
 
 Jobman is intentionally local.
 
-| Jobman handles | Jobman does not handle |
-| --- | --- |
-| Per-user jobs on one machine | Distributed scheduling |
-| Local dependency evaluation | Placement across hosts |
-| Process-tree lifecycle control | Cluster resource discovery |
-| Named concurrency pools | Preemption or fair-share scheduling |
-| Durable local logs and state | Remote log aggregation |
-| Operation over an existing SSH session | A remote-control service |
+| Jobman handles                         | Jobman does not handle              |
+| -------------------------------------- | ----------------------------------- |
+| Per-user jobs on one machine           | Distributed scheduling              |
+| Local dependency evaluation            | Placement across hosts              |
+| Process-tree lifecycle control         | Cluster resource discovery          |
+| Named concurrency pools                | Preemption or fair-share scheduling |
+| Durable local logs and state           | Remote log aggregation              |
+| Operation over an existing SSH session | A remote-control service            |
 
 A job can survive the terminal or SSH connection that submitted it. It may not survive the end of the operating-system user session, and Jobman does not present itself as a machine-level service manager.
 
