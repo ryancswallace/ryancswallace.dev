@@ -24,8 +24,6 @@ description: A practical guide to running reliable research pipelines with Jobma
   />
 </div>
 
-# Running Empirical Research Pipelines with Jobman
-
 <div class="grid gap-4 sm:grid-cols-[minmax(0,1fr)_16rem] sm:items-start">
   <div>
     <p class="mt-0">
