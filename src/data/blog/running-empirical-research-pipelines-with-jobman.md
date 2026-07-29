@@ -16,12 +16,45 @@ description: A practical guide to running reliable research pipelines with Jobma
 
 # Running Empirical Research Pipelines with Jobman
 
-Empirical research often involves long-running work on a local workstation or remote server:
-
-- cleaning data;
-- fitting models or running simulations;
-- producing tables and figures;
-- repeating specifications across samples and outcomes.
+<div class="grid gap-4 sm:grid-cols-[minmax(0,1fr)_16rem] sm:items-start">
+  <div>
+    <p class="mt-0">
+      Empirical research often involves long-running work on a local workstation
+      or remote server:
+    </p>
+    <ul class="mb-0">
+      <li>cleaning data;</li>
+      <li>fitting models or running simulations;</li>
+      <li>producing tables and figures;</li>
+      <li>repeating specifications across samples and outcomes.</li>
+    </ul>
+  </div>
+  <aside class="not-prose rounded-lg border border-border bg-muted/40 p-4">
+    <p class="mt-0 mb-3 text-sm font-semibold text-foreground">Project links</p>
+    <nav aria-label="Jobman links">
+      <ul class="m-0 list-none space-y-3 p-0">
+        <li>
+          <a
+            class="block text-sm font-medium break-words text-foreground underline decoration-dashed underline-offset-4 hover:text-accent"
+            href="https://github.com/ryancswallace/jobman"
+          >
+            ryancswallace/jobman
+          </a>
+          <span class="text-xs text-foreground/70">GitHub repository</span>
+        </li>
+        <li>
+          <a
+            class="block text-sm font-medium break-words text-foreground underline decoration-dashed underline-offset-4 hover:text-accent"
+            href="https://jobman.tech/"
+          >
+            Documentation
+          </a>
+          <span class="text-xs break-words text-foreground/70">jobman.tech</span>
+        </li>
+      </ul>
+    </nav>
+  </aside>
+</div>
 
 **[Jobman](https://github.com/ryancswallace/jobman)** runs these tasks durably in the background while adding support for inter-task dependencies, retries, timeouts, logs, concurrency limits, and notifications. It combines the benefits of `nohup` and terminal job control with the features of more heavy-weight schedulers.
 

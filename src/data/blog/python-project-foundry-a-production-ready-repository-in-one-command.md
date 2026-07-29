@@ -18,9 +18,52 @@ description: Python Project Foundry generates production-ready Python repositori
 
 # Python Project Foundry: A Production-Ready Repository in One Command
 
-Starting a new Python library is quick and easy, but creating the surrounding repository--testing, documentation, CI, security checks, packaging, releases, and containers--takes considerably longer.
-
-**[Python Project Foundry](https://github.com/ryancswallace/python-project-foundry)** generates an opinionated, production-ready repository for a Python package or library from an interactive questionnaire.
+<div class="grid gap-4 sm:grid-cols-[minmax(0,1fr)_16rem] sm:items-start">
+  <div>
+    <p class="mt-0">
+      Starting a new Python library is quick and easy, but creating the
+      surrounding repository--testing, documentation, CI, security checks,
+      packaging, releases, and containers--takes considerably longer.
+    </p>
+    <p class="mb-0">
+      <strong
+        ><a
+          href="https://github.com/ryancswallace/python-project-foundry"
+          >Python Project Foundry</a
+        ></strong
+      >
+      generates an opinionated, production-ready repository for a Python
+      package or library from an interactive questionnaire.
+    </p>
+  </div>
+  <aside class="not-prose rounded-lg border border-border bg-muted/40 p-4">
+    <p class="mt-0 mb-3 text-sm font-semibold text-foreground">Project links</p>
+    <nav aria-label="Python Project Foundry links">
+      <ul class="m-0 list-none space-y-3 p-0">
+        <li>
+          <a
+            class="block text-sm font-medium break-words text-foreground underline decoration-dashed underline-offset-4 hover:text-accent"
+            href="https://github.com/ryancswallace/python-project-foundry"
+          >
+            ryancswallace/python-project-foundry
+          </a>
+          <span class="text-xs text-foreground/70">GitHub repository</span>
+        </li>
+        <li>
+          <a
+            class="block text-sm font-medium break-words text-foreground underline decoration-dashed underline-offset-4 hover:text-accent"
+            href="https://ryancswallace.github.io/python-project-foundry/"
+          >
+            Documentation
+          </a>
+          <span class="text-xs break-words text-foreground/70"
+            >ryancswallace.github.io/python-project-foundry</span
+          >
+        </li>
+      </ul>
+    </nav>
+  </aside>
+</div>
 
 ```console
 uvx python-project-foundry ./my/new/project
