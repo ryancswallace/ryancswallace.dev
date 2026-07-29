@@ -103,8 +103,6 @@ Each project includes:
 - Installation smoke tests
 - Twine metadata validation
 
-Foundry is intended for importable Python packages and libraries. It does not add application-specific CLI commands or web frameworks.
-
 ## One interface for development
 
 The generated `Makefile` provides a discoverable command surface:
@@ -126,7 +124,7 @@ Common commands include:
 | Build distributions       | `make build`        |
 | Test containers           | `make docker-check` |
 
-This keeps local development and CI aligned. Contributors do not need to memorize every underlying tool invocation.
+This keeps local development and CI aligned. Contributors don't need to memorize every underlying tool invocation.
 
 ## Testing and quality controls
 

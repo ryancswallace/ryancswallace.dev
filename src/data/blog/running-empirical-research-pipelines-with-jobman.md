@@ -24,7 +24,7 @@ Empirical research often involves long-running work on a local workstation or re
 - producing tables and figures;
 - repeating specifications across samples and outcomes.
 
-Jobman runs these tasks in the background while adding dependencies, retries, timeouts, logs, concurrency limits, and notifications. It is useful when a shell script feels fragile but a cluster scheduler would be excessive.
+[Jobman](https://github.com/ryancswallace/jobman) runs these tasks in the background while adding dependencies, retries, timeouts, logs, concurrency limits, and notifications. It is useful when a shell script feels fragile but a cluster scheduler would be excessive.
 
 ## A typical research pipeline
 
