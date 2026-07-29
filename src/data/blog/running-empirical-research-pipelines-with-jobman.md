@@ -15,7 +15,7 @@ description: A practical guide to running reliable research pipelines with Jobma
 ---
 
 <div
-  class="not-prose mx-auto mb-8 flex max-w-xl justify-center rounded-xl bg-slate-950 px-6 py-5"
+  class="not-prose mx-auto mb-8 flex max-w-xl justify-center rounded-xl bg-[#212737] px-6 py-5"
 >
   <img
     class="h-auto w-full max-w-md !border-0"
