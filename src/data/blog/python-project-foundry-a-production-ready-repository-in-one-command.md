@@ -19,9 +19,10 @@ description: Python Project Foundry generates production-ready Python repositori
 <div class="grid gap-4 sm:grid-cols-[minmax(0,1fr)_16rem] sm:items-start">
   <div>
     <p class="mt-0">
-      Starting a new Python library is quick and easy, but creating the
-      surrounding repository--testing, documentation, CI, security checks,
-      packaging, releases, and containers--takes considerably longer.
+      Starting a Python library is easy. Setting up everything around
+      it--testing, documentation, CI, security checks, packaging, releases, and
+      containers--often takes longer than writing the first version of the
+      library itself.
     </p>
     <p class="mb-0">
       Python Project Foundry generates an opinionated, production-ready
@@ -72,7 +73,7 @@ uvx python-project-foundry ./my/new/project
 
 ## What Foundry generates
 
-Foundry creates more than just a Python package skeleton:
+Foundry starts with a package skeleton and builds the rest of the repository around it:
 
 ```text
 Questionnaire
@@ -89,11 +90,11 @@ Python package repository
 └── Release automation
 ```
 
-The scaffold created by Foundry is a repository with a consistent interface for local development and CI.
+The generated repository exposes the same commands to developers and CI.
 
 ## Quickstart
 
-The requirements to use the single-line invocation method below are uv, Git, Make, Node.js, and npm.
+The one-line invocation requires uv, Git, Make, Node.js, and npm.
 
 Generate a repository:
 
@@ -121,7 +122,7 @@ make check
 
 On Linux and macOS, Foundry can also initialize Git, install dependencies, create the initial commit, and install Git hooks.
 
-Alternatively, if you don't have uv installed, you can use the bootstrap script method to scaffold a new project:
+Without uv, use the bootstrap script:
 
 ```console
 curl -LsSf https://raw.githubusercontent.com/ryancswallace/python-project-foundry/main/ppf |
@@ -130,7 +131,7 @@ curl -LsSf https://raw.githubusercontent.com/ryancswallace/python-project-foundr
 
 ## Modern Python packaging defaults
 
-Generated repositories use a modern `src/` layout:
+Generated repositories use a `src/` layout:
 
 ```text
 src/
@@ -173,11 +174,11 @@ Common commands include:
 | Build distributions       | `make build`        |
 | Test containers           | `make docker-check` |
 
-This keeps local development and CI aligned. Developers don't need to memorize every underlying tool invocation.
+Local development and CI use the same commands, so contributors do not have to remember each underlying tool invocation.
 
 ## Testing and quality controls
 
-Generated projects combine several complementary tools:
+Each generated project wires together:
 
 | Concern                 | Tools                          |
 | ----------------------- | ------------------------------ |
@@ -217,7 +218,7 @@ The docs configuration uses the repository and package metadata supplied during 
 
 ## Security and supply-chain checks
 
-Security tooling is present from the first commit:
+Security checks are present from the first commit:
 
 - Bandit source scanning
 - pip-audit dependency auditing
@@ -230,7 +231,7 @@ Security tooling is present from the first commit:
 - CycloneDX SBOM generation
 - Artifact attestations
 
-These checks establish strong security baseline from the initial stages of development.
+The defaults are intentionally broad. A new repository starts with source, dependency, workflow, container, and release-artifact checks already wired into CI.
 
 ## Container support
 
@@ -242,7 +243,7 @@ Base image
 └── Test image
 ```
 
-Available workflows can:
+The generated workflows can:
 
 - Build the runtime image
 - Run package tests inside an image
@@ -336,7 +337,7 @@ Updates are pinned to the installed Foundry release rather than selecting the la
 
 ## Automation-friendly generation
 
-Interactive prompts are typically most convenient, but generation can also be unattended:
+For unattended generation, skip the questionnaire:
 
 ```console
 uvx python-project-foundry ./orbit-tools --defaults
@@ -355,7 +356,7 @@ Useful options include:
 
 Python Project Foundry is useful when you want a package repository with mature engineering practices from its first commit.
 
-It provides:
+Each generated repository includes:
 
 - Consistent local and CI commands
 - Typed Python packaging

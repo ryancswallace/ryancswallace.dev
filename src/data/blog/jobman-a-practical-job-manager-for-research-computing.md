@@ -64,7 +64,7 @@ description: A practical guide to running reliable research pipelines with Jobma
   </aside>
 </div>
 
-Jobman runs these tasks durably in the background while adding support for inter-task dependencies, retries, timeouts, logs, concurrency limits, and notifications. It combines the benefits of `nohup` and terminal job control with the features of more heavy-weight schedulers.
+Jobman keeps these tasks running after the terminal closes and adds dependencies, retries, timeouts, logs, concurrency limits, and notifications. It combines the benefits of `nohup` and terminal job control with the features of many heavy-weight schedulers.
 
 ## A typical research pipeline
 
@@ -80,14 +80,14 @@ flowchart LR
 
 Each stage should start only after its inputs are ready. A failure should stop dependent work rather than produce results from stale files.
 
-Jobman makes running these interdependent jobs easy. Submit the first two jobs:
+Submit the download and cleaning jobs first:
 
 ```console
 $ fetch=$(jobman run --name fetch -- python fetch.py)
 $ clean=$(jobman run --name clean --after-success "$fetch" -- Rscript clean.R)
 ```
 
-(The `jobman run` command returns immediately and prints the unique job ID of the newly created job to stdout, so the variables `$fetch`, `$clean`, etc. contain job IDs.)
+`jobman run` returns immediately and prints the new job's ID. The command substitutions above capture those IDs in `$fetch` and `$clean`.
 
 Submit the estimation job:
 
@@ -95,7 +95,7 @@ Submit the estimation job:
 $ model=$(jobman run --name model --after-success "$clean" -- stata -b do model)
 ```
 
-Finally, submit the output creation jobs:
+Once modeling succeeds, the tables and figures can run independently:
 
 ```console
 $ jobman run --after-success "$model" -- Rscript tables.R
@@ -106,7 +106,7 @@ Jobman records the dependency graph when each job is submitted. You can close th
 
 ## Check progress
 
-Use `list` for an overview of the **status** of all (active) jobs:
+Use `list` for an overview of active jobs:
 
 ```console
 $ jobman list --active
@@ -118,7 +118,7 @@ Use `status` for one job:
 $ jobman status model
 ```
 
-Use `show` for **job specifications** and the job's **run history**:
+Use `show` for the job specification and run history:
 
 ```console
 $ jobman show model
@@ -134,21 +134,21 @@ $ jobman show model
 
 ## Keep logs after disconnecting
 
-Jobman captures **stdout and stderr logs** independently.
+Jobman captures stdout and stderr independently.
 
-Show all logs (stdout and stderr) for a job:
+Show both streams for a job:
 
 ```console
 $ jobman logs model
 ```
 
-Follow logs for a running job:
+Follow a job as it runs:
 
 ```console
 $ jobman logs --follow model
 ```
 
-Inspect warnings (stderr only):
+Inspect stderr only:
 
 ```console
 $ jobman logs --stream stderr model
@@ -160,7 +160,7 @@ Read only the last 50 lines:
 $ jobman logs --lines 50 model
 ```
 
-Show logs across all runs for a job with several attempts:
+For a job with several attempts, include every run:
 
 ```console
 $ jobman logs --all model
@@ -172,7 +172,7 @@ Raw target output is recorded to disk and is _not_ automatically redacted. Don't
 
 ## Retry transient failures
 
-Downloads, APIs, database connections, and licensed software can fail temporarily. A bounded **retry policy** handles those cases without suppressing permanent errors.
+Downloads, APIs, database connections, and licensed software can fail temporarily. A bounded retry policy handles those failures without repeatedly running a job that cannot succeed.
 
 ```console
 $ jobman run --name download \
@@ -196,19 +196,19 @@ This allows you to customize the retry policy based on the type of failure encou
 
 ## Bound execution time
 
-Use a **run timeout** to stop one attempt:
+Use a run timeout to stop one attempt:
 
 ```console
 $ jobman run --run-timeout 2h -- python bootstrap.py
 ```
 
-Use a **job timeout** to bound the entire lifecycle, including waiting and retries:
+Use a job timeout to bound the entire lifecycle, including waiting and retries:
 
 ```console
 $ jobman run --job-timeout 8h -- python bootstrap.py
 ```
 
-Run timeouts and job timeouts can be combined:
+The two limits can be combined:
 
 ```console
 $ jobman run --run-timeout 2h --job-timeout 6h \
@@ -220,7 +220,7 @@ $ jobman run --run-timeout 2h --job-timeout 6h \
 | `--run-timeout` | One execution attempt                                 |
 | `--job-timeout` | Dependencies, queueing, delays, attempts, and retries |
 
-Timeouts are useful protection against stalled optimizers, infinite loops, inaccessible network resources, and simulations with pathological parameters.
+For example, timeouts can catch stalled optimizers, infinite loops, inaccessible network resources, and simulations stuck on pathological parameters.
 
 ## Limit concurrent work
 
@@ -258,23 +258,23 @@ Pools are useful for:
 - restricting calls to rate-limited services;
 - reserving capacity for different workload classes.
 
-## Wait for data to arrive
+## Wait for conditions to start
 
 A job can **wait** for various conditions before starting.
 
-To wait for a file:
+A job can wait for a file before starting:
 
 ```console
 $ jobman run --wait-file data/raw/complete.flag -- python clean.py
 ```
 
-To wait until a specified time:
+It can also wait until a specified time:
 
 ```console
 $ jobman run --wait-until 2026-08-01T02:00:00Z -- python import.py
 ```
 
-Or begin after a relative delay:
+Or start after a relative delay:
 
 ```console
 $ jobman run --wait-delay 30m -- python refresh.py
@@ -289,7 +289,7 @@ $ jobman run --wait-file data/ready \
 
 ## Organize related jobs
 
-Attach **groups and tags** when submitting work:
+Attach groups and tags when submitting work:
 
 ```console
 $ jobman run --group paper_a --tag baseline -- python model.py
@@ -316,7 +316,7 @@ Job names are labels, not unique identifiers. Reusing a name does not overwrite 
 
 ## Set the working environment explicitly
 
-The `run` subcommand supports multiple options for configuring the execution environment differently from the parent shell.
+Jobs inherit the submitting shell's environment by default, but `run` can override it.
 
 Set the working directory:
 
@@ -336,7 +336,7 @@ Remove an inherited value:
 $ jobman run --unset-env DEBUG -- python model.py
 ```
 
-Note that Jobman executes the specified target program directly. It does _not_ interpret shell operators unless you explicitly run a shell:
+Jobman executes the target directly. It does not interpret shell operators unless you explicitly run a shell:
 
 ```console
 $ jobman run -- sh -c 'python model.py > summary.txt'
@@ -346,13 +346,13 @@ Prefer direct execution when shell syntax is unnecessary.
 
 ## Repeat a specification
 
-**Rerun** a prior job without reconstructing its options:
+Rerun a prior job without reconstructing its options:
 
 ```console
 $ jobman rerun models --name models-rerun
 ```
 
-The new job receives a copy of the earlier job's specification and gets its own identity and history.
+The new job copies the earlier specification but has its own ID and history.
 
 For repeated sampling or simulations, define explicit completion limits:
 
@@ -370,8 +370,6 @@ $ jobman run --max-runs 110 --success-target 100 \
 This is useful when each execution produces one independent result that can be aggregated later.
 
 ## Control active work
-
-Jobman provides several **lifecycle commands**:
 
 Pause and resume are useful when interactive work temporarily needs the machine’s resources:
 
@@ -414,7 +412,7 @@ Notifications are especially useful for jobs running outside work hours and for 
 
 ## Use stable output in scripts
 
-Human-readable output is intended for terminals. Use **machine-readable JSON** for automation:
+Human-readable output is intended for terminals. Use JSON for automation:
 
 ```console
 $ jobman status --json models
@@ -437,7 +435,7 @@ Jobman records execution history, but it does not replace source control, data v
 
 ## Keep state manageable
 
-Preview history **cleanup** before deleting anything:
+Preview history cleanup before deleting anything:
 
 ```console
 $ jobman clean --older-than 30d

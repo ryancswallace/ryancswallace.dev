@@ -51,14 +51,12 @@ flowchart LR
     B -->|"exit 0"| E["Complete"]
 </div>
 
-The requirements are relatively simple:
+I want four things from this workflow:
 
 - preparation and analysis should run in the background;
 - analysis must not start unless preparation succeeds;
 - a transient analysis failure should be retried;
 - each attempt's output and result should remain inspectable.
-
-Start with disposable state and working directories:
 
 Submit the preparation step:
 
@@ -68,7 +66,7 @@ $ prepare_id=$(jobman run -- python prepare_data.py)
 
 `jobman run` returns the job's canonical ID immediately after a detached supervisor has claimed it. The target then continues independently of the submitting terminal.
 
-Submit the analysis dependent on the data preparation job:
+Then submit the analysis job with a dependency on preparation:
 
 ```console
 $ analyze_id=$(jobman run --after-success "$prepare_id" \
@@ -76,7 +74,7 @@ $ analyze_id=$(jobman run --after-success "$prepare_id" \
     -- python analyze_data.py)
 ```
 
-This specification records three job policy decisions:
+Those flags encode three decisions:
 
 | Option                          | Meaning                                                 |
 | ------------------------------- | ------------------------------------------------------- |
@@ -88,14 +86,14 @@ The policy is stored before the background supervisor begins evaluating it. A la
 
 ## Inspecting the job
 
-Jobman lets you inspect running or completed jobs:
+While the jobs run, inspect either one:
 
 ```console
 $ jobman status "$prepare_id"
 $ jobman status "$analyze_id"
 ```
 
-Wait for analysis to reach a completed state:
+Wait for analysis to reach a terminal state:
 
 ```console
 $ jobman wait "$analyze_id"
@@ -103,7 +101,7 @@ $ jobman wait "$analyze_id"
 
 `wait` is an observer, not an owner. Interrupting it does not cancel the job.
 
-The complete run history is still available afterward:
+After it finishes, `show` includes the complete run history:
 
 ```console
 $ jobman show "$analyze_id"
@@ -162,18 +160,18 @@ sequenceDiagram
 
 The supervisor is another invocation of the Jobman executable in a private mode. It owns one job and terminates after the job and its completion work finish.
 
-This model avoids several properties of a global daemon:
+With one supervisor per job, Jobman does not need:
 
 - a shared long-running failure domain;
 - privileged system integration;
 - daemon installation and upgrade coordination;
 - version skew between clients and a long-running service.
 
-That said, this model does _not_ eliminate all need for coordination. Supervisors and CLI commands still contend over shared state (in the datastore), so lifecycle changes use transactions and revision checks.
+It still needs coordination: supervisors and CLI commands contend over the same datastore, so lifecycle changes use transactions and revision checks.
 
 ## Storage follows the data
 
-Jobman uses two storage mechanisms because metadata storage and log storage are substantially different workloads with differing requirements.
+Metadata and logs put different demands on storage, so Jobman keeps them separate.
 
 <div class="mermaid">
 flowchart TB
@@ -192,14 +190,14 @@ SQLite is a good fit for:
 - schema migration;
 - querying job history.
 
-Raw files are a better fit for potentially large byte streams. By using raw files instead of SQLite for log data, Jobman doesn't need to turn arbitrary process output into database rows.
+Raw files are a better fit for potentially large byte streams. Keeping logs out of SQLite also means Jobman does not have to turn arbitrary process output into database rows.
 
 The split also lets Jobman record two distinct facts:
 
 1. what happened to the target process;
 2. whether its output was recorded completely.
 
-A logging failure does not rewrite a successful process exit as a failed execution. The target outcome and recording integrity are related but treated distinctly.
+A logging failure does not rewrite a successful process exit as a failed execution. Jobman reports the target outcome and the integrity of its logs separately.
 
 ## Direct execution is the default
 
@@ -217,7 +215,7 @@ Shell evaluation must be explicit:
 $ jobman run -- sh -c 'generate | compress > report.tar.gz'
 ```
 
-This preserves argument boundaries by default. It also avoids making quoting rules and command injection part of every Jobman invocation.
+Direct execution preserves argument boundaries. It also keeps shell quoting and command injection out of ordinary Jobman invocations.
 
 ## Product boundary
 
@@ -236,9 +234,9 @@ A job _can_ survive the terminal or SSH connection that submitted it, it _may no
 
 This boundary keeps the tool useful without introducing all the complexities of a distributed system.
 
-## Topics in detail
+## Next in the series on Jobman
 
-The command line API is the least complicated part of Jobman--the more interesting work is in the underlying technology:
+The CLI is the visible part of Jobman, but most of the interesting engineering sits underneath it:
 
 - safely transferring ownership to a detached supervisor;
 - making lifecycle transitions explicit and transactional;
@@ -246,7 +244,7 @@ The command line API is the least complicated part of Jobman--the more interesti
 - managing process trees on Linux, macOS, and Windows;
 - recording ordered output without placing bulk logs in SQLite.
 
-These are topics I'll cover in other articles in the [series on Jobman](https://ryancswallace.dev/tags/jobman/).
+I'll cover each of these in later articles in the [series on Jobman](https://ryancswallace.dev/tags/jobman/).
 
 <script type="module">
   import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
