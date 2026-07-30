@@ -16,6 +16,7 @@
         "color: .*"
     ],
     "words": [
+        "autoplay",
         "backurl",
         "bradlc",
         "cspell",
@@ -31,6 +32,7 @@
         "inspectable",
         "Jobman",
         "mikestead",
+        "minmax",
         "mktemp",
         "nohup",
         "pagefind",
