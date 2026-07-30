@@ -274,7 +274,7 @@ The selected value is used consistently in the license file, package metadata, c
 
 The proprietary option provides a general all-rights-reserved notice.
 
-## GitHub publishing is explicit
+## GitHub publishing
 
 Generating files does not automatically create external resources.
 
