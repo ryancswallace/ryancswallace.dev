@@ -2,8 +2,8 @@
 author: Ryan Wallace
 pubDatetime: 2026-07-25T10:04:00Z
 modDatetime: 2026-07-25T10:04:00Z
-title: "Running Empirical Research Pipelines with Jobman"
-slug: running-empirical-research-pipelines-with-jobman
+title: "Jobman: A Practical Job Manager for Research Computing"
+slug: jobman-a-practical-job-manager-for-research-computing
 featured: true
 draft: false
 tags:
