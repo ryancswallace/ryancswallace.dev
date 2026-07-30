@@ -89,11 +89,11 @@ Python package repository
 └── Release automation
 ```
 
-The result is a repository with a consistent interface for local development and CI.
+The scaffold created by Foundry is a repository with a consistent interface for local development and CI.
 
-## Quick start
+## Quickstart
 
-The requirements to use the single-line invocation method below are `uv`, Git, Make, Node.js, and npm.
+The requirements to use the single-line invocation method below are uv, Git, Make, Node.js, and npm.
 
 Generate a repository:
 
@@ -121,7 +121,7 @@ make check
 
 On Linux and macOS, Foundry can also initialize Git, install dependencies, create the initial commit, and install Git hooks.
 
-Alternatively, if you don't have `uv` installed, you can use the bootstrap script method to scaffold a new project:
+Alternatively, if you don't have uv installed, you can use the bootstrap script method to scaffold a new project:
 
 ```console
 curl -LsSf https://raw.githubusercontent.com/ryancswallace/python-project-foundry/main/ppf |
@@ -147,7 +147,7 @@ Each project includes:
 - Hatchling builds
 - A `py.typed` marker
 - Explicit Python version bounds
-- Locked dependencies through `uv`
+- Locked dependencies through uv
 - Wheel and source-distribution builds
 - Installation smoke tests
 - Twine metadata validation
