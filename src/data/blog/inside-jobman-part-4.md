@@ -5,7 +5,7 @@ modDatetime: 2026-08-02T18:00:00Z
 title: "Inside Jobman, Part 4: Process Trees, Timeouts, and Durable Logs"
 slug: inside-jobman-part-4
 featured: false
-draft: true
+draft: false
 tags:
   - jobman
   - go

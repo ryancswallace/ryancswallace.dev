@@ -5,7 +5,7 @@ modDatetime: 2026-08-02T16:00:00Z
 title: "Inside Jobman, Part 3: Scheduling Without a Central Scheduler"
 slug: inside-jobman-part-3
 featured: false
-draft: true
+draft: false
 tags:
   - jobman
   - go

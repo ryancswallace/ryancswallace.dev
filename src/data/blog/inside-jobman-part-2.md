@@ -5,7 +5,7 @@ modDatetime: 2026-08-02T14:48:00Z
 title: "Inside Jobman, Part 2: Transferring Job Ownership to a Detached Supervisor"
 slug: inside-jobman-part-2
 featured: false
-draft: true
+draft: false
 tags:
   - jobman
   - go
