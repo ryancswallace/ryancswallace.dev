@@ -1,7 +1,7 @@
 ---
 author: Ryan Wallace
-pubDatetime: 2026-08-26T16:22:00Z
-modDatetime: 2026-08-26T16:22:00Z
+pubDatetime: 2026-07-26T16:22:00Z
+modDatetime: 2026-07-26T16:22:00Z
 title: "Inside Jobman, Part 3: Scheduling Without a Central Scheduler"
 slug: inside-jobman-part-3
 featured: false
