@@ -14,6 +14,13 @@ tags:
 description: A technical introduction to Jobman's architecture through a real workflow with dependencies, retries, durable state, and logs.
 ---
 
+<!-- markdownlint-disable MD014 -->
+
+> **Inside Jobman:** **Part 1: Architecture** ·
+> [Part 2: Ownership transfer](/posts/inside-jobman-part-2/) ·
+> [Part 3: Scheduling](/posts/inside-jobman-part-3/) ·
+> [Part 4: Process control and logs](/posts/inside-jobman-part-4/)
+
 **[Jobman](https://github.com/ryancswallace/jobman)** is a daemonless job manager for local background processes. I wrote it for work that has outgrown `nohup` and ad hoc shell scripts but does not justify a full-fledged service or distributed scheduler.
 
 Jobman provides:
@@ -234,17 +241,15 @@ A job _can_ survive the terminal or SSH connection that submitted it, it _may no
 
 This boundary keeps the tool useful without introducing all the complexities of a distributed system.
 
-## Next in the series on Jobman
+## Continue the series
 
-The CLI is the visible part of Jobman, but most of the interesting engineering sits underneath it:
+In [Part 2: Transferring Job Ownership to a Detached Supervisor](/posts/inside-jobman-part-2/), I trace the submission protocol from its first SQLite transaction through the detached supervisor claim, including what happens when the acknowledgement is lost.
 
-- safely transferring ownership to a detached supervisor;
-- making lifecycle transitions explicit and transactional;
-- preserving state across crashes;
-- managing process trees on Linux, macOS, and Windows;
-- recording ordered output without placing bulk logs in SQLite.
+---
 
-I'll cover each of these in later articles in the [series on Jobman](https://ryancswallace.dev/tags/jobman/).
+**Next:** [Part 2: Transferring Job Ownership to a Detached Supervisor](/posts/inside-jobman-part-2/)
+
+[View every Jobman article](/tags/jobman/)
 
 <script type="module">
   import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
