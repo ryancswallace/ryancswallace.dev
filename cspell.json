@@ -35,6 +35,7 @@
         "minmax",
         "mktemp",
         "nohup",
+        "noncommutative",
         "pagefind",
         "processless",
         "pytest",
