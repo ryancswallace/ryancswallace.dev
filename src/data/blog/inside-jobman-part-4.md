@@ -1,7 +1,7 @@
 ---
 author: Ryan Wallace
-pubDatetime: 2026-08-02T18:00:00Z
-modDatetime: 2026-08-02T18:00:00Z
+pubDatetime: 2026-08-06T18:52:00Z
+modDatetime: 2026-08-06T18:52:00Z
 title: "Inside Jobman, Part 4: Process Trees, Timeouts, and Durable Logs"
 slug: inside-jobman-part-4
 featured: false

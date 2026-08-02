@@ -1,7 +1,7 @@
 ---
 author: Ryan Wallace
-pubDatetime: 2026-08-02T16:23:00Z
-modDatetime: 2026-08-02T16:23:00Z
+pubDatetime: 2026-08-10T16:23:00Z
+modDatetime: 2026-08-10T16:23:00Z
 title: "Benchmarking Is an Experiment: Trustworthy Python Regression Checks with benchmatrix"
 slug: benchmarking-is-an-experiment-with-benchmatrix
 featured: true
