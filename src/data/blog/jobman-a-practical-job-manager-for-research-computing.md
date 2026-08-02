@@ -14,6 +14,8 @@ tags:
 description: A practical guide to running reliable research pipelines with Jobman using dependencies, retries, timeouts, concurrency limits, durable logs, and notifications.
 ---
 
+<!-- markdownlint-disable MD014 -->
+
 <div
   class="not-prose mx-auto mb-8 flex max-w-xl justify-center rounded-xl bg-[#212737] px-6 py-5"
 >

@@ -1,7 +1,7 @@
 ---
 author: Ryan Wallace
-pubDatetime: 2026-07-28T14:48:00Z
-modDatetime: 2026-07-28T14:48:00Z
+pubDatetime: 2026-07-22T14:48:00Z
+modDatetime: 2026-07-22T14:48:00Z
 title: "Inside Jobman, Part 2: Transferring Job Ownership to a Detached Supervisor"
 slug: inside-jobman-part-2
 featured: false

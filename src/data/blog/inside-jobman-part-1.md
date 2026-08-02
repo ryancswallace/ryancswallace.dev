@@ -1,7 +1,7 @@
 ---
 author: Ryan Wallace
-pubDatetime: 2026-07-23T13:42:00Z
-modDatetime: 2026-07-23T13:42:00Z
+pubDatetime: 2026-07-17T13:42:00Z
+modDatetime: 2026-07-17T13:42:00Z
 title: "Inside Jobman, Part 1: Reliable Background Jobs Without a Daemon"
 slug: inside-jobman-part-1
 featured: false
