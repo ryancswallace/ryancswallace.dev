@@ -130,11 +130,11 @@ pytest collects one parametrized benchmark for each of the four cells. benchmatr
 
 The same matrix can expose three views of pytest-benchmark timings:
 
-| Metric              | Question                                                     | Better    |
-| ------------------- | ------------------------------------------------------------ | --------- |
-| Single-call latency | How long does one completed synchronous call take?           | Lower     |
-| Batch throughput    | How many units of work are completed per second?             | Higher    |
-| Tail latency        | How slow is the p95 end of the timing distribution?          | Lower     |
+| Metric              | Question                                            | Better |
+| ------------------- | --------------------------------------------------- | ------ |
+| Single-call latency | How long does one completed synchronous call take?  | Lower  |
+| Batch throughput    | How many units of work are completed per second?    | Higher |
+| Tail latency        | How slow is the p95 end of the timing distribution? | Lower  |
 
 These distinctions matter because a comparison shouldn't silently align different cases, confuse throughput with latency, or compare tail samples collected under incompatible iteration settings.
 
