@@ -66,9 +66,9 @@ description: A practical guide to running reliable research pipelines with Jobma
   </aside>
 </div>
 
-Jobman keeps these tasks running after the terminal closes and adds dependencies, retries, timeouts, logs, concurrency limits, and notifications. It combines the benefits of `nohup` and terminal job control with the features of many heavy-weight schedulers.
+Jobman keeps these tasks running after the terminal closes and adds dependencies, retries, timeouts, logs, concurrency limits, and notifications. It combines the benefits of `nohup` and terminal job control with the features of many heavier-weight schedulers.
 
-## A typical research pipeline
+## A example research pipeline
 
 Consider a project with four stages:
 
@@ -85,23 +85,21 @@ Each stage should start only after its inputs are ready. A failure should stop d
 Submit the download and cleaning jobs first:
 
 ```console
-$ fetch=$(jobman run --name fetch -- python fetch.py)
-$ clean=$(jobman run --name clean --after-success "$fetch" -- Rscript clean.R)
+$ jobman run --name fetch -- python fetch.py
+$ jobman run --name clean --after-success fetch -- Rscript clean.R
 ```
-
-`jobman run` returns immediately and prints the new job's ID. The command substitutions above capture those IDs in `$fetch` and `$clean`.
 
 Submit the estimation job:
 
 ```console
-$ model=$(jobman run --name model --after-success "$clean" -- stata -b do model)
+$ jobman run --name model --after-success clean  -- stata -b do model
 ```
 
 Once modeling succeeds, the tables and figures can run independently:
 
 ```console
-$ jobman run --after-success "$model" -- Rscript tables.R
-$ jobman run --after-success "$model" -- python figures.py
+$ jobman run --after-success model -- Rscript tables.R
+$ jobman run --after-success model -- python figures.py
 ```
 
 Jobman records the dependency graph when each job is submitted. You can close the terminal while the pipeline runs.
@@ -134,7 +132,7 @@ $ jobman show model
 | `wait JOB`   | Block until completion         |
 | `logs JOB`   | Read captured output           |
 
-## Keep logs after disconnecting
+## Persist and review logs
 
 Jobman captures stdout and stderr independently.
 
@@ -170,11 +168,11 @@ $ jobman logs --all model
 
 This is particularly useful for software that reports diagnostics like convergence warnings, dropped observations, or failed specifications on stderr.
 
-Raw target output is recorded to disk and is _not_ automatically redacted. Don't print credentials or confidential data to logs.
+Raw job output is recorded to disk and is _not_ automatically redacted. Avoid printing credentials or confidential data to logs.
 
 ## Retry transient failures
 
-Downloads, APIs, database connections, and licensed software can fail temporarily. A bounded retry policy handles those failures without repeatedly running a job that cannot succeed.
+Downloads, APIs, database connections, and licensed software can fail temporarily. A configurable retry policy handles those failures without repeatedly running a job that cannot succeed.
 
 ```console
 $ jobman run --name download \
@@ -196,7 +194,7 @@ This allows you to customize the retry policy based on the type of failure encou
 | Invalid program state     | Fail immediately     |
 | Run timeout               | Retry only when safe |
 
-## Bound execution time
+## Limit execution time
 
 Use a run timeout to stop one attempt:
 
@@ -204,7 +202,7 @@ Use a run timeout to stop one attempt:
 $ jobman run --run-timeout 2h -- python bootstrap.py
 ```
 
-Use a job timeout to bound the entire lifecycle, including waiting and retries:
+Use a job timeout to time-bound the entire lifecycle, including waiting and retries:
 
 ```console
 $ jobman run --job-timeout 8h -- python bootstrap.py
@@ -245,7 +243,7 @@ $ jobman run --pool models -- python model_a.py
 $ jobman run --pool models -- python model_b.py
 ```
 
-A memory-intensive job can request several slots:
+A memory- or CPU-intensive job can request several slots:
 
 ```console
 $ jobman run --pool models --slots 2 -- stata -b do simulation_a
@@ -255,16 +253,16 @@ Waiting jobs do not consume slots before their dependencies and wait conditions 
 
 Pools are useful for:
 
-- limiting simultaneous database queries;
 - preventing runs from exhausting RAM;
+- limiting simultaneous database queries;
 - restricting calls to rate-limited services;
 - reserving capacity for different workload classes.
 
 ## Wait for conditions to start
 
-A job can **wait** for various conditions before starting.
+The `--wait-*` flags instruct Jobman to wait for various conditions before starting the job.
 
-A job can wait for a file before starting:
+A job can wait for a file to exist before starting:
 
 ```console
 $ jobman run --wait-file data/raw/complete.flag -- python clean.py
@@ -308,15 +306,14 @@ Possible research-oriented groups include:
 - `paper`;
 - `policy`;
 - `replication`;
-- `robustness`;
 - `simulation`;
 - `data-refresh`.
 
-Tags can record characteristics such as `baseline`, `placebo`, `restricted-sample`, or `clustered-se`.
+Tags can also record characteristics such as `baseline`, `robustness`, or `clustered-se`.
 
 Job names are labels, not unique identifiers. Reusing a name does not overwrite an earlier job.
 
-## Set the working environment explicitly
+## Control the working environment
 
 Jobs inherit the submitting shell's environment by default, but `run` can override it.
 
@@ -332,7 +329,7 @@ Set an environment value:
 $ jobman run --env SPEC=baseline -- python model.py
 ```
 
-Remove an inherited value:
+Remove an inherited environment variable:
 
 ```console
 $ jobman run --unset-env DEBUG -- python model.py
@@ -344,7 +341,7 @@ Jobman executes the target directly. It does not interpret shell operators unles
 $ jobman run -- sh -c 'python model.py > summary.txt'
 ```
 
-Prefer direct execution when shell syntax is unnecessary.
+Prefer direct execution unless shell syntax is necessary.
 
 ## Repeat a specification
 
@@ -362,7 +359,7 @@ For repeated sampling or simulations, define explicit completion limits:
 $ jobman run --max-runs 100 --success-target 100 -- python simulate_once.py
 ```
 
-Jobman can also tolerate a bounded number of failed draws:
+Jobman can also abort after a specified number of failed runs:
 
 ```console
 $ jobman run --max-runs 110 --success-target 100 \
@@ -392,9 +389,9 @@ Waiting on a job blocks until the job completes:
 $ jobman wait models
 ```
 
-## Receive completion notifications
+## Notifications
 
-Jobman supports configured command callbacks, HTTPS webhooks, and SMTP notifications.
+Jobman supports configured command callbacks, webhooks (HTTPS), and email (SMTP) notifications.
 
 For example, if a notifier named `research` is configured, this invocation sends a message to that notification channel if the job fails:
 
@@ -402,7 +399,7 @@ For example, if a notifier named `research` is configured, this invocation sends
 $ jobman run --notify research --notify-on job_failed -- python models.py
 ```
 
-Useful events include:
+Useful events that Jobman can notify about include:
 
 - job succeeded;
 - job failed;
@@ -426,10 +423,10 @@ This makes it easier to generate run manifests or record job outcomes alongside 
 
 For reproducibility, retain:
 
-- the canonical job ID;
-- the source revision;
-- the input-data version;
-- the software environment;
+- the canonical job ID (displayed by `jobman run`);
+- the source revision (e.g., commit hash);
+- the input-data version (e.g., checksum);
+- the software environment (e.g., `uv.lock`);
 - the command or named job specification;
 - relevant Jobman JSON output.
 
@@ -443,13 +440,15 @@ Preview history cleanup before deleting anything:
 $ jobman clean --older-than 30d
 ```
 
-Apply the cleanup:
+Apply the cleanup with `--force`:
 
 ```console
 $ jobman clean --older-than 30d --force
 ```
 
-Check the local store:
+The `clean` subcommand avoids removing active state or metadata still required by another job.
+
+Check that the local Jobman metadata store is healthy:
 
 ```console
 $ jobman doctor
@@ -461,13 +460,13 @@ Create a metadata backup before an upgrade or major cleanup:
 $ jobman doctor --backup jobman-backup.db
 ```
 
-Do not delete files inside the Jobman state directory by hand. Jobman avoids removing active state or metadata still required by another job.
+Do not delete files inside the Jobman state directory by hand.
 
 ## Where Jobman fits
 
 Jobman is designed for single-user work on one machine.
 
-| Good fit                           | Use another system                        |
+| Good fit                           | Use another system/tool                   |
 | ---------------------------------- | ----------------------------------------- |
 | Workstation, server, cloud compute | Multi-node computation                    |
 | Jobs submitted over SSH            | Cluster-wide scheduling                   |
@@ -478,8 +477,8 @@ Jobman is designed for single-user work on one machine.
 Note that Jobman jobs:
 
 - _will_ survive a closed terminal or SSH connection;
-- _may_ end when the operating system user session ends, depending on host configuration;
-- will _not_ survive host shutdown or reboot.
+- _may_ survive when the operating system user session ends, depending on host configuration;
+- _will not_ survive host shutdown or reboot.
 
 For many research workflows, this is the useful middle ground: more reliable and feature-rich than unmanaged background processes, but substantially simpler than a heavy-weight scheduler.
 
