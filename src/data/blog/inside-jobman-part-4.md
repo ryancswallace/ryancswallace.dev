@@ -23,9 +23,9 @@ description: How Jobman controls process trees across platforms, enforces cancel
 > [Part 3: Scheduling](/posts/inside-jobman-part-3/) ·
 > **Part 4: Process control and logs**
 
-[Part 3](/posts/inside-jobman-part-3/) ended when an analysis shard acquired concurrency capacity. The supervisor may now start a run, but it still has to cross a difficult boundary: an operating-system process can spawn descendants, ignore graceful termination, write to two streams concurrently, and disappear between observation and persistence.
+[Part 3](/posts/inside-jobman-part-3/) left an analysis shard with a concurrency admission. A run can now be started. The remaining work sits at the operating-system boundary, where a process may create descendants, fill two output pipes at once, ignore a polite request to stop, or exit between inspection and a database commit.
 
-Suppose one shard uses four worker processes. The parent reports progress on stdout, workers report diagnostics on stderr, and a stuck worker should not survive a timeout:
+Suppose the admitted shard creates four worker processes. Progress is written to stdout, diagnostics are written to stderr, and a stuck worker must not survive the timeout:
 
 ```console
 $ shard_id=$(jobman run --after-success "$prepare_id" \
@@ -35,17 +35,13 @@ $ shard_id=$(jobman run --after-success "$prepare_id" \
     -- python analyze_data.py --shard 3 --workers 4)
 ```
 
-Managing this run requires Jobman to preserve three different facts:
+Three facts will eventually need to be stored: which process tree may be controlled, how the target ended, and how much of its output was captured. They can disagree. A successful exit does not certify the logs, and a full log does not turn a failed command into a success. A PID, by itself, proves neither identity nor ownership.
 
-1. which process tree it started and is allowed to control;
-2. how the target actually terminated; and
-3. whether its output was recorded completely.
+## A run record is created before a process
 
-Those facts are related, but they are not interchangeable. A successful exit does not prove that every log byte reached storage. A logging failure does not change the target's exit code. A stale PID is not permission to signal whatever process now has that number.
+After admission, a run ID and run number are allocated. A private log directory is created with stdout and stderr files, a chunk-order index, and an active-capture marker. The run is then committed in `starting`, and the existing admission is bound to it.
 
-## Reserve the run before starting it
-
-After admission, the supervisor allocates a run ID and number. Before creating the target process, it creates a private log directory containing stdout, stderr, a chunk-order index, and an active-capture marker. It then commits a `starting` run with those paths and binds the concurrency admission to that run.
+Only after those records exist is the target created.
 
 <div class="mermaid">
 sequenceDiagram
@@ -70,17 +66,19 @@ sequenceDiagram
     S->>DB: Commit exit, outcome, and log integrity
 </div>
 
-Durable reservation gives a failed start somewhere to go. If executable resolution or `Start` fails, Jobman records a `start_failed` run rather than leaving an unexplained gap in job history. Start failures may be retryable when policy allows.
+This ordering leaves somewhere to record a failed `Start`. Executable resolution may fail, permissions may be wrong, or the operating system may reject the launch. In those cases, a `start_failed` run is committed instead of leaving a missing attempt in the job history. Retry policy may allow another attempt.
 
-Everything after `--` remains an executable and argument vector. Jobman resolves it against the stored working directory and environment without joining arguments into a shell command. It then attaches stdin according to policy and creates separate stdout and stderr pipes.
+Everything after `--` remains an executable plus an argument vector. Resolution is performed against the stored working directory and environment; no shell command is assembled behind the scenes. Stdin is attached according to policy, and stdout and stderr are given separate pipes.
 
-There is an unavoidable interval between the operating system creating a process and Jobman committing its identity. Jobman keeps this interval small. It establishes the platform tree boundary, inspects the new process, and only then moves the run from `starting` to `running`. If identity setup fails, it terminates and reaps the target instead of publishing an unmanageable process as active. If the process starts but its identity cannot be committed safely, Jobman terminates the tree and records ownership as lost rather than pretending the start was clean.
+An uncomfortable interval still remains. The process exists before its identity can be committed. During that interval, the platform-specific tree boundary is established and the process is inspected. The run is moved from `starting` to `running` only after that setup succeeds.
 
-## Control a tree, not a PID
+If the tree cannot be made manageable, it is terminated and reaped. If a verified identity cannot be published safely, the tree is terminated and ownership is recorded as lost. A live process is not left behind under a run that only appears to be controlled.
 
-The analysis parent can create four workers, and those workers can create children of their own. Signaling only the parent could leave descendants running after the job is reported as canceled or timed out.
+## A remembered PID is too weak
 
-Jobman creates a separately addressable target tree using the strongest suitable primitive on each platform:
+The analysis parent may create four workers, which may create descendants of their own. Terminating only the parent can leave the workers running after Jobman has reported a cancellation or timeout.
+
+A separately addressable tree is therefore created for every run:
 
 | Platform | Target boundary         | Identity evidence                                | Tree-wide control                                                            |
 | -------- | ----------------------- | ------------------------------------------------ | ---------------------------------------------------------------------------- |
@@ -88,24 +86,21 @@ Jobman creates a separately addressable target tree using the strongest suitable
 | macOS    | Dedicated process group | PID, kernel process start time, kernel boot time | The same group signals, with explicit handling for exiting processes         |
 | Windows  | Named Job Object        | PID, process-creation time, system boot time     | Best-effort console break, Job Object termination, and per-member suspension |
 
-On Linux and macOS, the target starts as the leader of a new process group. Descendants normally remain in that group, so signaling the negative group ID reaches the tree rather than only the leader.
+On Linux and macOS, the target becomes the leader of a new process group. Descendants normally stay in that group, so a signal sent to the negative group ID reaches the group rather than only its leader.
 
-Windows requires a different sequence. The target starts suspended, is assigned to a named Job Object, and is then resumed. A handle is duplicated into the target so the Job Object remains available after the supervisor closes its setup handle. Descendants inherit membership, and later Jobman invocations can reopen the named object for tree-wide control.
+The Windows setup has more moving parts. The target is created suspended, assigned to a named Job Object, and then resumed. A Job Object handle is duplicated into the target so the object remains alive after the supervisor closes its setup handle. Descendants inherit membership, and another Jobman process can later reopen the named object.
 
-The user-visible contract is the same even though the mechanisms are not: cancellation, forced termination, pause, and resume apply to the managed tree.
+The same operations are exposed on all three platforms—cancel, force, pause, and resume—but their implementations are intentionally different.
 
-Before any control operation, Jobman re-inspects the process. The persisted identity includes creation and boot information in addition to the PID. If the current process does not match, the operation fails with an identity mismatch. PID reuse must never cause Jobman to terminate an unrelated process.
+Before any of those operations, the process is inspected again. Creation and boot identity are compared in addition to the PID. If the stored identity no longer matches, control is refused. PIDs are reused routinely; an old Jobman record must never authorize a signal to whichever unrelated process received that number next.
 
-## Intent before signal
+## A stop request is written down before it is sent
 
-Cancellation and timeouts are durable lifecycle transitions before they are operating-system effects. If `jobman cancel` targets the shard, Jobman first records cancellation intent. The canceling client may then signal the revalidated tree immediately; the supervisor also observes the durable intent and remains responsible for reaping the target and finalizing the run.
+When `jobman cancel` is used on the shard, cancellation intent is first committed to SQLite. The canceling client may then signal the revalidated tree immediately. The supervisor sees the same durable request, remains responsible for reaping the target, and commits the final run state.
 
-Timeouts use the same ordering. Jobman distinguishes two budgets:
+The ordering is useful during a badly timed crash. If the client disappears after the commit but before the signal, the supervisor still sees the request. If the signal is delivered and the client disappears afterward, the reason for the signal has already been recorded.
 
-- a **run timeout** covers one invocation and may be classified as retryable;
-- a **whole-job timeout** covers dependencies, capacity waits, retry delays, and runs, and is terminal.
-
-Time spent paused is subtracted from both budgets. A pause is not an application checkpoint, but it should not consume the time Jobman promised the target.
+Timeouts use the same lifecycle path. Two budgets are supported. A run timeout covers one invocation and may produce a retryable result. A whole-job timeout includes time spent waiting for dependencies, capacity, and retry delays, and ends the job. Paused time is deducted from both budgets; suspension should not consume execution time promised by the configured timeout.
 
 <div class="mermaid">
 flowchart LR
@@ -120,15 +115,15 @@ flowchart LR
     G -->|"no"| I["Report control failure"]
 </div>
 
-The graceful request is `SIGTERM` to the process group on Unix. On Windows, `CTRL_BREAK_EVENT` is best effort because a detached supervisor may not share the target's console. After the configured grace period, forced Job Object termination provides the reliable Windows tree-wide stop; Unix uses `SIGKILL`.
+On Unix, `SIGTERM` is sent to the process group and `SIGKILL` is used after the grace period when forced termination is enabled. On Windows, `CTRL_BREAK_EVENT` is attempted for the graceful step. That signal is best effort because the detached supervisor may not share the target's console. Job Object termination supplies the reliable forced stop.
 
-The durable outcome records why Jobman stopped the run, while exit metadata records what the operating system reported. This distinction matters on Windows, where forced Job Object termination may appear as exit code 1. Jobman stores the run as `timed_out` or `cancelled` and preserves the lower-level observation as a platform reason rather than misclassifying it as an ordinary command failure.
+The recorded outcome describes why Jobman stopped the run. Exit metadata separately describes what the operating system reported. Forced Job Object termination may be observed as exit code 1, for example, while the durable run outcome remains `timed_out` or `cancelled` and the platform reason is retained.
 
-## Drain both pipes before waiting
+## Both pipes must keep moving
 
-The parent and its workers may write to stdout and stderr at the same time. Operating-system pipes have finite buffers. If the supervisor reads one stream to completion before touching the other, a worker can fill the neglected pipe and block the entire tree.
+The parent and its workers can write to stdout and stderr concurrently. Each operating-system pipe has a finite buffer. A straightforward loop that reads stdout to EOF and then starts on stderr can deadlock: a worker fills stderr, blocks before closing it, and the stdout reader waits forever for the process to finish.
 
-Jobman starts one drain goroutine per stream:
+One drain goroutine is started for each stream:
 
 ```go
 go drainPipe(stdout, capture, logstore.Stdout)
@@ -140,15 +135,15 @@ go func() {
 }()
 ```
 
-The excerpt omits bookkeeping, but the order is significant. Both pipes are drained concurrently, and `Wait` is called only after their readers finish. Calling `Wait` first can let `os/exec` close a pipe under a reader, losing final bytes and falsely reporting degraded capture.
+The unusual-looking order in the last goroutine is deliberate. Both readers are allowed to finish before `Wait` is called. If `Wait` closes an `os/exec` pipe while a reader is still consuming its final bytes, those bytes can be lost and capture may be reported as degraded even though the target exited normally.
 
-Even when capture is disabled for a stream, Jobman drains it to `io.Discard`. The target must never block merely because its output is not being retained. If a log write fails, Jobman likewise switches to draining the remaining pipe data to a discard path so the storage failure does not deadlock the process it is observing.
+A stream is still drained when its capture has been disabled; the bytes are copied to `io.Discard`. The same fallback is used after a log write fails. Storage trouble is allowed to degrade the record, but it is not allowed to stop pipe consumption and freeze the target.
 
-## Raw streams plus an ordering index
+## Raw bytes are kept separate
 
-Jobman stores stdout and stderr as separate raw files. They are byte-preserving and make no assumptions about UTF-8, line endings, or whether a write ends with a newline. Either stream can be read independently even if the combined ordering metadata is damaged.
+Stdout and stderr are stored in separate raw files. No UTF-8, line-ending, or newline assumption is made. Each stream remains independently readable even when the metadata used to combine them has been damaged.
 
-Separate files do not say how writes from the two streams were interleaved. For combined output, Jobman adds a fixed-size chunk index. Each 52-byte record contains:
+Those two files cannot show how the streams were interleaved. A fixed-size chunk index is written alongside them. Each 52-byte record contains:
 
 | Field                       | Purpose                                               |
 | --------------------------- | ----------------------------------------------------- |
@@ -158,31 +153,31 @@ Separate files do not say how writes from the two streams were interleaved. For 
 | Timestamp                   | Record when the supervisor observed the chunk         |
 | CRC-32C                     | Detect a corrupt complete record                      |
 
-The index records observed order, not a stronger causal order inside the target. Two worker writes racing on separate pipes have no portable total order until the supervisor reads them. A mutex serializes those observed appends and assigns contiguous sequence numbers.
+Only the order observed by Jobman is promised. If two workers write to different pipes at nearly the same time, the operating system exposes no portable causal ordering between them. Whichever chunk is appended first receives the next sequence number under a mutex.
 
-For every chunk, Jobman writes and syncs the raw bytes first, then writes and syncs the index record. That ordering creates an important one-way guarantee:
+## The raw write is synced before its index entry
 
-> A valid index record never refers to raw bytes that were not already written.
+For each chunk, the raw bytes are written and synced before the corresponding index record is written and synced. The ordering is intentionally one-way: every valid index entry must refer to bytes that were already made durable.
 
-A crash between the two syncs can leave raw bytes without an index entry. Those bytes remain authoritative in the individual stream, but their position relative to the other stream is unknown. Combined output therefore omits the unindexed tail and reports it explicitly instead of guessing an order.
+A crash between those two syncs leaves a less tidy case. Raw bytes may exist without an index entry. They are still available when stdout or stderr is read separately, but their position relative to the other stream cannot be recovered. Combined output omits that unindexed tail and reports the condition rather than inventing an order.
 
-A partial final index record is treated as a torn tail and ignored. Corruption in a complete record, a sequence gap, a bad checksum, or an index range beyond the raw file is an error. Readers validate the complete index snapshot before copying combined output.
+Different treatment is given to different index failures. An incomplete final record is accepted as a torn crash tail and ignored. A complete record with a bad checksum, a sequence gap, or a byte range outside the raw file is reported as corruption. The complete index snapshot is validated before combined output is copied to the caller.
 
-## Rotation preserves history
+This makes partial durability visible without turning every interrupted append into total log loss.
 
-With `--log-segment-bytes`, stdout and stderr rotate independently. Version 2 of the index adds a per-stream segment number, while keeping one global chunk sequence across both streams.
+## A segment limit preserves the prefix
 
-Rotation never deletes an earlier segment to make room. If a configured segment-count limit is reached, capture becomes degraded and everything already recorded remains intact. The supervisor continues draining the target's pipes so the process can finish.
+When `--log-segment-bytes` is set, stdout and stderr rotate independently. Version 2 of the index includes a segment number for each stream while retaining one sequence across both.
 
-This favors an honest prefix over a misleading window. Deleting old segments during capture would require rewriting index history or presenting a suffix as though it were complete.
+No old segment is deleted to make space during capture. Once the configured segment count has been reached, recording becomes degraded and previously written segments are left intact. Pipe draining continues so the target can exit.
 
-An `.active` marker prevents retention cleanup from treating an open capture as completed. Later cleanup requires durable eligibility, rechecks filesystem identity and containment, and records pruning in metadata rather than making missing files look like an unexplained loss.
+The result is an honest prefix. Replacing early segments with a later window would either require index history to be rewritten or make a suffix look like the complete stream.
 
-## Process outcome and recording health
+An `.active` marker is present while capture remains open. Retention cleanup uses it to avoid treating an in-progress directory as completed. Filesystem identity and containment are checked again before eligible logs are pruned, and the removal is reflected in metadata rather than appearing later as unexplained missing files.
 
-After the target exits, the supervisor finishes both drain goroutines, calls `Wait`, closes and syncs the log files, measures their authoritative sizes, and commits the run result.
+## Exit status and capture health may disagree
 
-The persisted record deliberately has separate dimensions:
+After both drains finish, `Wait` is called, the files are closed and synced, authoritative byte counts are measured, and the result is committed. Several dimensions are stored separately:
 
 | Fact             | Examples                                                               |
 | ---------------- | ---------------------------------------------------------------------- |
@@ -191,28 +186,21 @@ The persisted record deliberately has separate dimensions:
 | Log integrity    | `pending`, `valid`, or `partial`                                       |
 | Recording health | `healthy` or `degraded`, with a bounded diagnostic code                |
 
-If `analyze_data.py` exits successfully but the disk fills during stderr capture, the run may still be `success` with `partial` log integrity and degraded recording health. Conversely, complete logs do not turn a nonzero, non-retryable exit into success.
+Suppose `analyze_data.py` exits zero just as the disk fills during stderr capture. The run can be stored as `success` while log integrity is `partial` and recording health is degraded. The reverse is also possible: pristine logs do not alter a nonzero, non-retryable exit.
 
-This separation is useful to both humans and automation. A caller can decide that process success is sufficient, require complete logs as an additional condition, or alert on degraded recording without rewriting the job's factual outcome.
+Automation can choose which fact it requires. Process success may be sufficient for one workflow, while another may reject a result unless complete logs were retained. Degraded capture can be alerted on without rewriting the target's actual outcome.
 
-It also narrows crash recovery. If a supervisor disappears while capture is pending, Jobman can mark the logs partial and the run lost. It does not infer the target's result from its last log line, and it does not infer complete recording from a normal exit code.
+The separation also keeps crash recovery honest. If the supervisor vanishes while capture is pending, the logs can be marked partial and the run can be marked lost. No result is inferred from the final log line, and a normal exit code is never used as proof that all output reached storage.
 
-## A trustworthy local boundary
+## Where the boundary stops
 
-For the analysis shard, Jobman does more than start `python` and remember a PID. It reserves the run, establishes a process-tree boundary, publishes a revalidatable identity, records stop intent before signaling, drains both output streams, and commits process and log results without conflating them.
+For one analysis shard, a surprising amount of machinery sits between admission and completion. A run is reserved, a tree identity is established, stop intent is persisted, two streams are drained, and process and capture results are committed independently.
 
-The implementation differs across operating systems, and it cannot make arbitrary application behavior transactional. A child can deliberately leave its managed boundary, a graceful handler can perform external work before exiting, and ending the operating-system user session can terminate the supervisor. Those are part of Jobman's local, per-user product boundary.
+Some behavior remains outside Jobman's control. A child can deliberately escape its process group, a graceful handler can perform external work before exiting, and ending the operating-system user session can terminate the supervisor. Those limits follow from the local, per-user model described in Part 1.
 
-Within that boundary, the invariants are concrete:
+Inside that boundary, a stale PID is never treated as authority. Graceful and forced stops are directed at the managed tree. Index records are published only after their raw bytes, and log damage is not folded into the command's exit result.
 
-- no process is controlled from a PID alone;
-- cancellation and timeout intent precede their side effects;
-- the managed tree receives graceful and, when configured, forced termination;
-- stdout and stderr are drained independently;
-- valid index entries never name unwritten bytes; and
-- target outcome remains distinct from log integrity.
-
-Together with durable ownership and transactional scheduling, those invariants complete the core design: every job has one owner, every run competes under shared limits, and every recorded result says what Jobman actually knows.
+Those rules finish the path started with submission: ownership was transferred in Part 2, capacity was assigned in Part 3, and the final run record now states only what could actually be observed.
 
 ---
 

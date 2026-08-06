@@ -22,9 +22,9 @@ description: How independent Jobman supervisors coordinate dependencies, waits, 
 > **Part 3: Scheduling** ·
 > [Part 4: Process control and logs](/posts/inside-jobman-part-4/)
 
-In [Part 2](/posts/inside-jobman-part-2/), I followed a job from submission through the point where a detached supervisor commits ownership. Acceptance does not mean the target command has started. The supervisor may still need to wait for dependencies, evaluate other prerequisites, or acquire concurrency capacity.
+[Part 2](/posts/inside-jobman-part-2/) stopped after ownership had been committed to a detached supervisor. The target command had not necessarily been started. Dependencies could still be active, a retry delay could be pending, or the configured concurrency limit could already be full.
 
-Return to the preparation and analysis pipeline from [Part 1](/posts/inside-jobman-part-1/), but suppose the input is divided into four shards. All four analysis jobs depend on the same preparation job and share a concurrency pool:
+Consider the preparation and analysis pipeline from [Part 1](/posts/inside-jobman-part-1/), with the input now divided into four shards. All four analysis jobs depend on the same preparation job and use a pool with two slots:
 
 ```yaml
 schema_version: 1
@@ -43,20 +43,15 @@ $ for shard in 1 2 3 4; do
   done
 ```
 
-Each submission has its own supervisor. When preparation succeeds, those four processes become eligible at roughly the same time, but the `analysis` pool permits only two active runs. There is no central Jobman process holding a queue in memory or waking the winners.
+Four supervisors are left waiting. When preparation succeeds, all four may observe that result within the same polling interval. Only two runs are allowed into the `analysis` pool.
 
-The supervisors coordinate through SQLite instead. Prerequisite observations, queue order, slot allocations, leases, and retry deadlines are durable state. Any supervisor may disappear without taking the scheduling record with it.
+No central Jobman process chooses the winners. Each supervisor attempts its own state transition against SQLite, and the transactions settle the race. The queue, slot allocations, retry deadlines, and evidence used to recover stale owners are all stored there. If a supervisor disappears, the scheduling record is left behind.
 
-The resulting design is decentralized, but it is not uncoordinated.
+## Eligibility is checked before capacity
 
-## Eligibility and admission are different decisions
+The word “queued” can obscure two separate situations. A job may be unable to run because a prerequisite is missing, or it may be ready but waiting for capacity. Those cases are kept separate in Jobman.
 
-Before starting a run, a supervisor answers two questions:
-
-1. **Is the job eligible?** Its dependencies and wait conditions must be satisfied, and no timeout, pause, or cancellation may prevent progress.
-2. **Is the job admitted?** Enough global and named-pool slots must be available, and no older competing request may currently have priority.
-
-Keeping these decisions separate prevents jobs from occupying scarce capacity while they wait for something unrelated to that capacity. A job waiting for a file, a dependency, or a retry delay consumes a supervisor process, but it does not consume an execution slot.
+Before an admission is requested, dependencies and wait conditions are evaluated. Cancellation, pause state, and timeouts are checked as well. Only an eligible job is allowed to compete for slots.
 
 <div class="mermaid">
 flowchart TD
@@ -79,65 +74,56 @@ flowchart TD
     N --> A
 </div>
 
-No sleep, probe, or process execution occurs inside a database transaction. Transactions record short decisions; supervisors perform longer work outside them and return with new observations.
+A file wait or dependency can last for hours. Capacity is not reserved during that time. One lightweight supervisor process remains, but no execution slot is consumed.
 
-## Dependencies are durable observations
+Long-running work is also kept out of SQLite transactions. A transaction records a decision or an observation and closes. Sleeps, filesystem probes, and target processes are handled afterward.
 
-At submission, a dependency selector such as `--after-success "$prepare_id"` is resolved to a canonical job ID. Jobman rejects missing references, contradictory predicates, and dependency cycles before the job leaves submission.
+## A dependency edge becomes a receipt
 
-The stored edge describes both the referenced job and the outcome predicate:
+When `--after-success "$prepare_id"` is submitted, the selector is resolved immediately to a canonical job ID. Missing references, contradictory predicates, and dependency cycles are rejected before submission completes.
 
-| Predicate       | Eligible when the dependency...                     |
-| --------------- | --------------------------------------------------- |
-| `after-success` | completes successfully                              |
-| `after-finish`  | reaches any terminal outcome                        |
-| `after-failed`  | completes with a failure outcome                    |
-| `after-outcome` | reaches one of an explicit set of terminal outcomes |
+The edge stores the required relationship:
 
-While a dependency remains active, the dependent supervisor has nothing final to record. It stays in `waiting` and periodically checks again.
+| Predicate       | Eligible when the dependency...             |
+| --------------- | ------------------------------------------- |
+| `after-success` | completes successfully                      |
+| `after-finish`  | reaches any terminal outcome                |
+| `after-failed`  | completes with a failure outcome            |
+| `after-outcome` | reaches one of the listed terminal outcomes |
 
-When the dependency completes, evaluation takes a transactional snapshot of its revision and outcome onto the edge. That observation is written once. Later evaluations use the recorded values rather than reinterpret the relationship from a mutable display name or shell command.
+While preparation is active, no final observation can be made. Each shard stays in `waiting` and checks again later.
 
-For the shard example, a successful preparation outcome satisfies all four edges. If preparation fails, the `after-success` predicate can never become true. Jobman completes each dependent job as `aborted` with a `dependency_unsatisfied` diagnostic instead of leaving it in `waiting` forever.
+Once preparation completes, its revision and outcome are copied onto the dependency edge in a transaction. That observation is written once. The edge now acts like a receipt: the exact terminal state that satisfied the prerequisite has been recorded, and the relationship will not be reinterpreted through a display name that may later be reused.
 
-This is simpler than a durable event-delivery system between jobs. Supervisors do not subscribe to an in-memory completion channel, and a dependency does not need to find and notify every dependent process. The terminal snapshot already exists in the shared datastore; each dependent can observe it independently.
+A successful preparation satisfies all four shard edges. A failed preparation makes `after-success` impossible. Each dependent job can then be completed as `aborted` with the `dependency_unsatisfied` diagnostic instead of being left in `waiting` forever.
 
-## Wait conditions use the same gate
+No completion message has to be delivered from one job to every dependent. If a notification were missed during a crash, extra recovery machinery would be needed. Here, the completed dependency is already durable and can be observed independently by each supervisor.
 
-Dependencies describe relationships between Jobman jobs. Wait conditions cover prerequisites outside Jobman's lifecycle model:
+## Files and probes pass through the same gate
 
-- an absolute time;
-- a delay after acceptance;
-- the existence and optional type of a filesystem path; or
-- a bounded executable probe.
+Some prerequisites do not belong to another Jobman job. A run may be held until an absolute time, for a delay after acceptance, until a filesystem path exists, or until an executable probe succeeds.
 
-Multiple conditions combine with `all` or `any`. Probe execution preserves argument boundaries, has a timeout and output limit, and records a bounded diagnostic rather than unbounded command output. Each evaluation is persisted, making `show --json` useful when a job appears stuck.
+Multiple wait conditions can be combined with `all` or `any`. Probe arguments remain separate rather than being joined into a shell command. Execution is bounded by a timeout and an output limit, and a short diagnostic is persisted after each evaluation. When `jobman show --json` is used on a job that appears stuck, those observations show what has actually been checked.
 
-Wait conditions and dependencies gate only the initial run. Once the prerequisites are satisfied, Jobman records that fact and does not require them again for every retry. A wait-abort deadline or whole-job timeout can terminate the job before its first run if eligibility never arrives.
+Dependencies and wait conditions are initial gates. After they have been satisfied, they are not reevaluated before every retry. A wait-abort deadline or whole-job timeout may still end the job before its first run.
 
-The important scheduling property is the same: no admission is held while prerequisites are pending.
+Only after this stage is an admission requested.
 
-## Capacity is a transaction, not a counter in memory
+## One transaction decides the slot race
 
-After eligibility, a supervisor requests a positive number of slots. A job assigned to a named pool consumes that many slots from both the store-wide capacity and the pool's capacity. A job without a pool consumes only global slots.
+An eligible job requests a positive slot count. When a named pool is selected, those slots are charged against both the store-wide limit and the pool limit. Without a named pool, only the global limit is used.
 
-An impossible request is rejected during submission. If the `analysis` pool has capacity two, a request for three slots will never fit, so allowing it to wait would only create a permanently blocked queue entry.
+Requests that can never fit are rejected during submission. A three-slot request cannot run in the two-slot `analysis` pool, so no useful result would come from placing it in the queue.
 
-A request that can fit eventually but cannot fit now enters the durable admission queue. Each acquisition attempt runs as one short transaction that:
+A request that fits in principle but not at the moment is different. Its durable queue position is created or reloaded during each acquisition attempt. In the same short transaction, active admissions are counted, the fairness rule is applied, and either a new admission is inserted or the request remains queued.
 
-1. loads the current global and relevant pool capacities;
-2. records or reloads the request's queue position;
-3. counts slots held by active admissions;
-4. applies the fairness rule; and
-5. either inserts the admission or leaves the request queued.
+This is the point at which the four shard supervisors meet. Suppose two slots have already been taken and the other two supervisors concurrently read an apparently available final slot. Their reads may overlap, but their writes cannot both commit on the same old state. SQLite serializes the admission transactions. The winner records its allocation; the other attempt observes the new usage or loses the compare-and-swap and stays queued.
 
-SQLite serializes the writes. If two shard supervisors see the last available slot and try to acquire it simultaneously, the first transaction commits the admission. The second transaction then observes the updated usage and remains queued. There is no interval in which both can successfully reserve the same capacity.
+After admission, the job enters `starting`. The allocation is bound to the run once that run has been reserved. A failed attempt leaves the original queue position intact instead of sending the job to the back.
 
-On success, the job moves into `starting`, and its admission is then bound to the newly reserved run. On failure, the job remains `queued`, and its existing queue position survives later acquisition attempts.
+## The oldest request may be bypassed, three times
 
-## Fairness without wasting capacity
-
-A plain first-in, first-out queue is predictable, but variable slot sizes create head-of-line blocking. Suppose a pool has capacity four:
+Strict first-in, first-out ordering behaves poorly when jobs request different numbers of slots. Suppose a pool has room for four:
 
 | Current state             | Slots |
 | ------------------------- | ----: |
@@ -146,16 +132,11 @@ A plain first-in, first-out queue is predictable, but variable slot sizes create
 | Younger queued request    |     1 |
 | Capacity currently unused |     2 |
 
-The oldest request cannot start until at least three slots are free. Strict FIFO would also block the one-slot request, leaving two usable slots idle. Always admitting any request that fits would improve utilization, but a steady stream of small jobs could starve the older three-slot request indefinitely.
+The three-slot request cannot start. Under strict FIFO, the one-slot request would also be blocked and two usable slots would sit idle. If every smaller request were always allowed through, the large request could instead be starved by a steady stream of short jobs.
 
-Jobman uses bounded bypasses:
+A bounded bypass is used. When the oldest competing request does not fit, a younger request that does fit may be admitted. The older request's bypass counter is incremented in the same transaction. Once three bypasses have been recorded, younger competitors must wait for it.
 
-- if the oldest competing request fits now, a younger request cannot pass it;
-- if the oldest request does not fit and the younger request does, the younger one may be admitted;
-- each such admission increments the older request's durable bypass count; and
-- after three bypasses, younger competing requests wait until the older request can proceed.
-
-In reduced form, the decision is:
+In reduced form:
 
 ```go
 older := oldestCompetingRequest(request)
@@ -171,66 +152,47 @@ persistAdmission(request)
 incrementBypassCount(older)
 ```
 
-The real implementation performs the reads and writes in the same transaction. Requests compete only when they share a finite scope: the global limit, the same finite named pool, or both. Unrelated pools do not block one another merely because their supervisors happen to poll in the same order.
+Competition is limited to shared finite scopes: the global limit, the same finite named pool, or both. Requests in unrelated pools are not ordered against one another just because their supervisors happen to poll at the same time.
 
-Initial queue order is based on when prerequisites became satisfied, with the canonical job ID breaking equal-time ties deterministically. A failed acquisition keeps that position. The rule is not preemption or weighted fair sharing, but it bounds starvation while allowing limited backfilling.
+Initial order is based on the time prerequisites were satisfied, with the canonical job ID used to break ties. This is not weighted fair sharing, and no running job is preempted. The narrower goal is to allow some backfilling without making starvation unbounded.
 
-## Admission leases do not free capacity by themselves
+## An expired lease does not manufacture a free slot
 
-An acquired admission has a lease, and the owning supervisor renews it while a run is active. The lease is liveness evidence, not an expiration timer on capacity.
+Every admission has a lease that is renewed by its supervisor while the run is active. It would be tempting to treat the expiration timestamp as automatic capacity reclamation. That could violate the limit.
 
-Automatically returning slots as soon as a lease timestamp passes could exceed the configured limit. A delayed supervisor or temporarily busy datastore might still have a live target using the resource while another job is admitted into the supposedly free slots.
+A laptop may have resumed from sleep, or a live supervisor may have been delayed while SQLite was busy. Its target could still be using the resource even though the lease is stale. If those slots were immediately reassigned, both the old and new runs would be counted as active outside the database while only one allocation appeared inside it.
 
-Instead, an expired admission triggers conservative reconciliation. Jobman checks the owning job, supervisor lease, and recorded process identity. Capacity is released only after the owner is proven gone or the job has already completed. If ownership cannot be verified safely, Jobman does not guess.
+Expiration therefore starts reconciliation. The owning job, supervisor lease, and stored process identity are checked. Capacity is released after the owner is shown to be gone or the job has already completed. When identity cannot be verified safely, the allocation is left alone.
 
-This follows the same principle as the supervisor handoff in Part 2: timestamps tell Jobman when to investigate, while durable identity and transitions determine what it may change.
+The timestamp says when doubt is justified. It does not prove that a process has stopped.
 
-## Retries return to the queue
+## A retry gives up its seat
 
-When a run finishes, the supervisor classifies its result as success, retryable failure, or non-retryable failure. Completion policy considers cancellation, whole-job timeout, success and failure counts, the run limit, and any retry deadline in a fixed order. The resulting transition is committed, and the admission is released before the supervisor waits or starts another run.
+After a run ends, its result is classified as success, retryable failure, or non-retryable failure. Cancellation, whole-job timeout, success and failure counts, the run limit, and any retry deadline are then evaluated in a fixed order.
 
-If another attempt is allowed, Jobman computes its constant, linear, or exponential delay, applies the configured cap and bounded jitter, and persists either:
+The admission is released before another attempt is delayed or started. If the retry policy permits another run, constant, linear, or exponential delay is calculated with the configured cap and bounded jitter. An exact `next_run_at` timestamp is persisted for `backoff`; without a delay, the job returns directly to `queued`.
 
-- `backoff` with an exact `next_run_at` timestamp; or
-- `queued` when no delay is required.
+No slot is held during backoff. Once the timestamp is reached, admission must be won again. A flaky shard therefore cannot occupy half of the analysis pool while it waits for its next attempt.
 
-The supervisor waits without holding slots. Once the deadline arrives, the job competes for admission again. A flaky job therefore cannot monopolize a constrained pool across its retry delay, and other eligible work can run between attempts.
+The whole-job timeout continues across dependency waits, admission waits, and retry delays. A run timeout covers only one target invocation and can itself produce a retryable result. Actual termination belongs to the execution boundary described in Part 4; the scheduler only decides whether another run may follow.
 
-The whole-job timeout continues to bound time spent waiting for dependencies, capacity, and retry delays. A per-run timeout, by contrast, applies to one target invocation and may itself be classified as retryable. Process termination and timeout enforcement occur at the execution boundary; this scheduling layer decides whether another admitted run should follow.
+## Polling is used on purpose
 
-## Polling is an explicit tradeoff
+Without a resident scheduler, no shared condition variable is available when a dependency completes or a slot is returned. Supervisors check durable state at bounded intervals.
 
-Without a daemon, Jobman has no central condition variable to notify every supervisor when a dependency completes or a slot is released. Supervisors recheck durable state at bounded intervals.
+The ordinary interval is 100 milliseconds. Symmetric jitter between 90 and 110 percent is applied so the four shard supervisors do not keep waking in lockstep after being submitted together. Longer intervals can be configured for wait conditions, and backoff polling is bounded by the recorded eligibility time.
 
-The ordinary scheduler interval is 100 milliseconds. Jobman applies symmetric jitter from 90 to 110 percent of that interval so a group of supervisors accepted together does not continue waking and contending in lockstep. Wait conditions may specify a longer poll interval, and backoff polling is bounded by the recorded eligibility time.
+Some database reads and up to a polling interval of scheduling latency are accepted here. In exchange, a missed in-memory wake-up cannot strand a job. After a restart, no queue has to be reconstructed from a scheduler process because the useful parts of that queue were already stored.
 
-Polling trades some database reads and bounded scheduling latency for a much simpler failure model:
+This trade is aimed at local jobs owned by one user on one machine. Thousands of remote workers or sub-millisecond dispatch would call for a different design.
 
-- there is no resident process whose in-memory queue must be reconstructed;
-- a missed notification cannot strand a job indefinitely;
-- supervisors can recover stale owners and admissions while doing ordinary work; and
-- every decision can be inspected from persisted state.
+## The queue survives its supervisors
 
-The tradeoff is appropriate for Jobman's intended scale: local jobs owned by one user on one host. A cluster scheduler with thousands of workers, remote placement, or sub-millisecond dispatch requirements would need a different architecture.
+For the shard pipeline, the dependency revision says why each job became eligible. The prerequisites-satisfied timestamp preserves its initial place in line. Admission rows and bypass counts record who received capacity and who was allowed through. Leases identify allocations that deserve investigation. Retry timestamps keep policy from being reconstructed from process memory or log text.
 
-## What the datastore coordinates
+Each supervisor still acts for only one job. Coordination occurs where a shared fact must be changed, through a short transaction against those durable records. No supervisor is given authority to schedule the others.
 
-For the four analysis shards, SQLite ultimately coordinates more than a numeric limit:
-
-| Durable fact                    | What it prevents                                  |
-| ------------------------------- | ------------------------------------------------- |
-| Dependency revision and outcome | Reinterpreting an already observed prerequisite   |
-| Prerequisites-satisfied time    | Losing initial eligibility order                  |
-| Admission request and bypasses  | Restarting the queue or starving a large request  |
-| Active slot allocation          | Exceeding global or named-pool capacity           |
-| Admission and supervisor leases | Silently abandoning ownership                     |
-| Retry deadline and run counts   | Reconstructing policy from process memory or logs |
-
-The supervisors remain independent processes, but their decisions are serialized where they must be. No supervisor decides that another job should run; each attempts its own transition against the same durable constraints.
-
-That is what makes scheduling possible without a central scheduler: eligibility is observable, capacity is transactional, fairness is persisted, and failure does not erase queue state.
-
-The next part will cross the operating-system boundary: how Jobman creates and controls a target process tree, drains its output without deadlocking, and records a trustworthy result when process execution or log capture fails.
+Once one shard has been admitted, another boundary has to be crossed. A target may spawn descendants, fill stdout and stderr pipes, ignore graceful termination, or exit while its final output is still being drained. [Part 4: Process Trees, Timeouts, and Durable Logs](/posts/inside-jobman-part-4/) follows that run from reservation through its recorded result.
 
 ---
 

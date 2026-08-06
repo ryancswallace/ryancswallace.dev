@@ -22,7 +22,7 @@ description: How Jobman durably transfers a submitted job to a detached supervis
 > [Part 3: Scheduling](/posts/inside-jobman-part-3/) ·
 > [Part 4: Process control and logs](/posts/inside-jobman-part-4/)
 
-In [Part 1](/posts/inside-jobman-part-1/), I submitted an analysis job that depended on an earlier preparation step:
+In [Part 1](/posts/inside-jobman-part-1/), an analysis job was submitted with a dependency on an earlier preparation step:
 
 ```console
 $ analyze_id=$(jobman run --after-success "$prepare_id" \
@@ -30,21 +30,17 @@ $ analyze_id=$(jobman run --after-success "$prepare_id" \
     -- python analyze_data.py)
 ```
 
-The command prints a job ID and exits while the analysis continues in the background. That looks like an ordinary process launch, but the important operation is not starting Python. It is transferring responsibility for the job to another process.
+The command returns a job ID while the work continues in the background. At that point, Python may not have been started. The preparation job may still be running, a concurrency slot may be unavailable, or a retry delay may eventually be needed. What has been accepted is responsibility for seeing the job through those states.
 
-After the submitting CLI exits, something still has to wait for the dependency, acquire concurrency capacity, start and reap each attempt, capture its output, enforce timeouts, and commit the final result. Jobman assigns that work to a detached supervisor dedicated to one job.
+That responsibility cannot be left with the submitting CLI. Its terminal may be closed as soon as the ID is printed. A separate process must remain to evaluate the dependency, start and reap each attempt, capture output, enforce timeouts, and commit the result. In Jobman, those duties are assigned to a detached supervisor created for one job.
 
-The difficult question is when the CLI may safely report that the job was accepted. A child PID is not enough. The child might exit before taking ownership, the ownership transaction might commit while its acknowledgement is lost, or the submitting terminal might disappear during either step.
+The handoff crosses an awkward boundary. One side is a SQLite transaction; the other is an operating-system process launch. They cannot be made atomic. A crash can land between them, and the small acknowledgement pipe used during launch can fail after ownership has already been committed.
 
-Jobman treats acceptance as a protocol:
+The protocol was arranged around those gaps. Whenever the handoff is interrupted, enough state should remain to answer a practical question later: was the job accepted, or was it not?
 
-> A submission succeeds only after the CLI observes a durable supervisor claim, either through the normal acknowledgement or by reconciling with the datastore.
+## The transaction ends at the process boundary
 
-The datastore is authoritative. The pipes between the two processes only make the common case fast.
-
-## The handoff
-
-The complete handoff has two durable transitions separated by a process launch:
+Two durable transitions are separated by the supervisor launch:
 
 <div class="mermaid">
 sequenceDiagram
@@ -69,22 +65,17 @@ sequenceDiagram
     S->>S: Evaluate prerequisites and run policy
 </div>
 
-There is deliberately no transaction spanning the process launch. SQLite cannot atomically commit a row and create an operating-system process. Instead, Jobman makes each side independently recoverable and defines which durable state is valid at every boundary.
+No lock is held across the entire sequence. Holding a SQLite transaction open while another process is created would not make the launch part of that transaction; it would only leave a database lock sitting across a relatively slow and failure-prone system call.
 
-## Persist before detaching
+Instead, the job is written first. The supervisor is then launched and asked to claim the durable record. Each step has a state that can be recognized after a crash.
 
-Before starting the supervisor, Jobman resolves the effective configuration and constructs an immutable job specification. It includes the executable and argument vector, working directory, environment policy, dependency IDs, retry policy, timeouts, logging policy, and other settings the supervisor will need later.
+## The job is written before its owner exists
 
-Dependency selectors are resolved to canonical job IDs at this point. A later job with the same display name cannot change what the submitted analysis job depends on.
+Before the supervisor is started, the effective configuration is resolved into an immutable job specification. The executable and argument vector, working directory, environment policy, retry and timeout settings, dependency IDs, and logging policy are all included. The supervisor will load that record later rather than reconstructing policy from the launch command.
 
-Jobman then generates:
+Dependency selectors are also resolved to canonical job IDs during submission. If another job is later given the same display name, the analysis job's dependency is left unchanged.
 
-- a UUIDv7 job ID;
-- 32 random bytes for a one-time launch credential;
-- a SHA-256 hash of that credential; and
-- a bounded claim deadline, currently ten seconds after submission.
-
-Reduced to its essential operations, submission looks like this:
+A UUIDv7 job ID and 32 random credential bytes are then generated. A SHA-256 hash of the credential is stored with a claim deadline, currently ten seconds after submission. In outline, the ordering looks like this:
 
 ```go
 credential := make([]byte, 32)
@@ -104,49 +95,34 @@ store.SubmitWithDependencies(
 launchSupervisor(jobID, credential)
 ```
 
-The actual implementation checks every error, but the ordering is the point: the job is committed before the supervisor is launched.
+Every error is checked in the real implementation. The useful detail here is the position of `launchSupervisor`: it comes after the transaction.
 
-That first transaction inserts the job in the `submitting` phase together with its runtime state, immutable dependency edges, and initial `job_submitted` event. A reader can never observe a submitted job without the prerequisites that govern whether it may run.
+That transaction creates the job in the `submitting` phase, stores its runtime state and dependency edges, and appends the initial `job_submitted` event. A partially submitted job cannot be observed without the dependencies that control its eligibility.
 
-Only the credential hash is stored. The plaintext credential exists briefly in the submitting process and travels to the supervisor through an inherited stdin pipe. It does not appear in command-line arguments, environment variables, logs, or persistent state.
+If the CLI dies immediately afterward, an ownerless `submitting` record is left behind. This is intentional. Once the claim deadline has passed, reconciliation can complete that job with the `submission_failed` outcome. The stranded record explains exactly how far submission got.
 
-If the CLI crashes after the transaction but before launching the supervisor, the job remains visibly `submitting`. Once its claim deadline expires, reconciliation can complete it as `submission_failed`. There is a durable explanation rather than a job that silently remains active or is guessed to have started.
+Only the credential hash is persisted. The plaintext bytes are held briefly by the CLI and passed through an inherited stdin pipe. They are kept out of command-line arguments, environment variables, logs, and the database.
 
-## The same binary, in a private mode
+## A hidden command with very little authority
 
-The supervisor is another invocation of the Jobman executable using a hidden `__supervise` command. Its command line contains the non-secret job ID, but not the target executable or its policy. Those are loaded from the committed specification.
+The supervisor is started by invoking the Jobman executable again with its private `__supervise` command. Only the non-secret job ID is placed on its command line. The analysis command, working directory, dependencies, and policy are read from the committed job specification.
 
-The launch creates two short-lived pipes:
+Two short-lived pipes are inherited:
 
-- stdin carries exactly one launch credential to the supervisor;
-- stdout carries one bounded, versioned acknowledgement back to the CLI.
+- stdin is used to deliver exactly one launch credential;
+- stdout is used to return one bounded, versioned acknowledgement.
 
-The supervisor's stderr is detached from the submitting terminal. Platform-specific launch settings create the longer-lived process boundary: a new session on Linux and macOS, and detached process-group facilities on Windows.
+Supervisor stderr is detached from the terminal. A new session is created on Linux and macOS; the corresponding detached process-group facilities are used on Windows.
 
-The Go context boundary is just as important. The supervisor is created with a context derived using `context.WithoutCancel`. Interrupting `jobman run`, closing the terminal, or losing an SSH connection must not cancel a supervisor that has already been accepted.
+The Go context is detached as well. `context.WithoutCancel` is used when the supervisor process is created. This can look suspicious in ordinary request-handling code, where cancellation is normally expected to propagate. Here, propagation would be the bug: an interrupt delivered to `jobman run`, an SSH disconnect, or a closed terminal must not cancel a job whose ownership has already been transferred.
 
-This private command is a transport, not an alternate API. A caller cannot use it to substitute a different executable, working directory, or log path. The durable record remains the only source of trusted job configuration.
+The private command is kept deliberately narrow. It cannot be used to replace the stored executable or supply a different log path. Its only useful input is a job ID plus proof that it was launched for the pending submission.
 
-## Claiming ownership atomically
+## Ownership is claimed once
 
-The supervisor reads the 32-byte credential, opens the same datastore, generates its own UUIDv7 ID, and records its operating-system process identity. It then attempts to claim the job.
+After reading the credential, the supervisor opens the datastore, assigns itself a UUIDv7 ID, and inspects its operating-system process identity. A claim is accepted only while the job remains in `submitting`, the deadline is still open, the credential hash matches, and the expected job revision is current.
 
-The claim is valid only if all of the following remain true:
-
-- the job is still in `submitting`;
-- its claim deadline has not expired;
-- the supplied credential matches the stored hash;
-- the expected job revision is current; and
-- the supervisor identity and lease are valid.
-
-On success, one SQLite transaction:
-
-1. moves the job from `submitting` to `starting`;
-2. increments its revision;
-3. records the supervisor ID and claim time;
-4. clears the launch credential hash and claim deadline;
-5. creates the supervisor record and initial lease; and
-6. appends the corresponding job and supervisor events.
+One SQLite transaction then moves the job to `starting`, records the supervisor and its initial lease, clears the credential and deadline, increments the revision, and appends the claim events.
 
 <div class="mermaid">
 stateDiagram-v2
@@ -159,92 +135,79 @@ stateDiagram-v2
     starting --> [*]: ownership transferred
 </div>
 
-Clearing the credential makes it single-use. Even if another copy of the supervisor command is started with the original bytes, it cannot claim the job again. A second claimant also loses the revision-and-phase comparison after the first transaction commits.
+Clearing the hash makes the launch credential single-use. Any second supervisor holding the same bytes arrives too late. It also encounters a different phase and revision after the first claim has committed.
 
-This is optimistic concurrency rather than a long-held application lock. Each mutable snapshot has a monotonically increasing revision. An update includes its expected revision and phase in the SQL `WHERE` clause; updating zero rows is a conflict, not success. The caller must reload the current state and decide what that state means for the requested operation.
+This is handled as optimistic concurrency. Mutable records carry monotonically increasing revisions, and updates include the expected phase and revision in their SQL predicates. If no row is updated, the operation is treated as a conflict. Current state must be reloaded before another decision is made.
 
-## When the acknowledgement disappears
+No long-held application lock is needed, and a stale supervisor is prevented from overwriting work committed by a newer actor.
 
-After the claim commits, the supervisor sends a small JSON acknowledgement containing a schema version, the job ID, and the supervisor ID. The CLI bounds the response size, rejects unknown fields, verifies both identities, and normally prints the job ID immediately.
+## A broken pipe does not answer the question
 
-Now consider a failure in the analysis example: the claim commits, but the supervisor exits or the pipe closes before the acknowledgement reaches `jobman run`.
+Once the claim is committed, a small JSON acknowledgement is written by the supervisor. It contains a schema version, job ID, and supervisor ID. Its size is bounded, unknown fields are rejected, and both identifiers are checked by the CLI.
 
-From the CLI's perspective, the pipe failure is ambiguous. It could mean the supervisor never claimed the job, or it could mean a valid owner is already evaluating the preparation dependency. Treating the pipe failure as a failed submission would invite the caller to submit a duplicate. Killing the child would be worse: the PID might no longer identify the process that committed the claim.
+Now suppose the claim for the analysis job commits and the acknowledgement pipe closes before the reply is read. Two very different histories look identical from the submitting process:
 
-Jobman therefore reloads the job using a fresh, bounded context. This reconciliation is intentionally independent of the submitting command's canceled context. If the datastore contains a valid supervisor ID and the job has advanced beyond `submitting`, the handoff succeeded. The CLI synthesizes the same acknowledgement from durable state and returns the job ID normally.
+- the supervisor may have exited before claiming anything;
+- the supervisor may already own the job and be waiting for the preparation dependency.
 
-If no claim is present, Jobman reports the launch failure. An unclaimed job that passes its deadline is later finalized as `submission_failed`; uncertain identity is never converted into a guessed success.
+Reporting a failed submission in the second case would encourage a duplicate to be submitted. Sending a signal to the remembered child PID would be unsafe as well; the process may already have exited, and the number may have been reused.
 
-The main crash windows are:
+The job is therefore reloaded from SQLite using a fresh, bounded context. The canceled context of the original CLI is not reused for reconciliation. If a supervisor ID has been committed and the job has advanced beyond `submitting`, ownership was transferred. The durable record is used to reconstruct the acknowledgement, and the job ID is returned normally.
 
-| Failure point                             | Durable state                              | Interpretation                                        |
-| ----------------------------------------- | ------------------------------------------ | ----------------------------------------------------- |
-| Before the submission transaction commits | No job                                     | Submission failed                                     |
-| After commit, before supervisor launch    | `submitting`, unclaimed                    | Reconcile after the claim deadline                    |
-| After launch, before claim                | `submitting`, unclaimed                    | Another valid claim may still win before the deadline |
-| After claim, before acknowledgement       | `starting`, supervisor recorded            | Submission succeeded                                  |
-| After acknowledgement, before ID is shown | Claimed job remains discoverable in Jobman | Submission succeeded, though the shell lost its reply |
-| Supervisor disappears after claiming      | Claimed job with an aging lease            | Verify identity, then reconcile conservatively        |
+If no claim is found, the launch error is reported. An unclaimed record is finalized as `submission_failed` after its deadline.
 
-The protocol cannot guarantee that a shell captures the printed ID if the shell itself disappears. It guarantees that an accepted job has a durable canonical ID and owner that later Jobman commands can inspect.
+The crash windows can be read directly from the durable state:
 
-## A state machine, not a status string
+| Interruption point                        | State left behind                           | Later interpretation                          |
+| ----------------------------------------- | ------------------------------------------- | --------------------------------------------- |
+| Before the first transaction commits      | No job                                      | Submission failed                             |
+| After commit, before launch               | `submitting`, no owner                      | Finalize after the claim deadline             |
+| After launch, before claim                | `submitting`, no owner                      | A valid claim may still arrive                |
+| After claim, before acknowledgement       | `starting`, supervisor recorded             | Submission succeeded                          |
+| After acknowledgement, before ID is shown | Claimed job, discoverable by other commands | Submission succeeded; the shell lost the ID   |
+| After a claimed supervisor disappears     | Claimed job with an aging lease             | Verify the stored identity before reconciling |
 
-The claim protocol is one use of a broader rule in Jobman: lifecycle changes are explicit transitions, not arbitrary assignments to a status column.
+The last two cases cannot guarantee that the shell captured the printed ID. A canonical ID and owner have still been committed, so the job can be found with later Jobman commands.
 
-The model layer receives validated snapshots and returns a transition result containing updated job, run, or supervisor state; append-only event drafts; and any external effects that should follow the commit. The store validates the result again and writes the new snapshots and events in one transaction.
+## State changes are guarded, then recorded
 
-This separates three questions:
+The claim follows the same pattern used elsewhere in Jobman. Lifecycle phases are not assigned freely. A validated snapshot is passed to the model layer, and a transition result is returned with updated state, append-only event drafts, and any external effects that should follow the commit. The result is validated again by the store before the snapshot and events are written together.
 
-1. **Is the transition legal?** A job can be claimed only from `submitting`, and a run can start only after it has been durably reserved.
-2. **Did this caller win the race?** Revision and phase predicates reject stale updates from concurrent processes.
-3. **What external work follows?** The supervisor is launched only after submission commits; cancellation intent is committed before a signal is sent.
+This arrangement prevents several mundane but damaging races. A supervisor may renew its lease while a CLI records cancellation. Two clients may request cancellation at nearly the same time. Reconciliation may mark ownership as lost just before an old supervisor attempts to finalize a run. In each case, the expected revision decides which transition may commit.
 
-The current snapshot makes inspection efficient. The event history explains how the snapshot was reached. Jobman is not rebuilt by replaying events, but a visible transition cannot commit without its corresponding event.
+External effects are ordered around those commits. The supervisor is launched after the submission record exists. Cancellation intent is committed before a signal is sent. A run is reserved before its target process is published. These boundaries are small enough to inspect, test, and reconcile individually.
 
-This matters because multiple independent processes may act on the same job. A supervisor can renew its lease while another CLI records cancellation. Two clients can request cancellation at nearly the same time. A stale supervisor may try to finalize a run after reconciliation has already marked its ownership lost. Compare-and-swap transitions ensure that only a state change based on the current revision can commit.
+Repeated operations are handled according to their meaning. A duplicate request for an already accepted cancellation may return the committed result without sending a second destructive effect. A conflicting operation whose result depends on order must be reevaluated against fresh state.
 
-Idempotent operations are handled deliberately. Repeating the same accepted cancellation can return the committed result without producing another destructive effect. A conflicting noncommutative operation must reload and reevaluate instead of blindly retrying an old update.
+The current snapshot is used for fast inspection; the associated events explain how it was reached. Jobman does not rebuild every job by replaying its event history, but a visible transition and its event are committed together.
 
-## Leases are evidence, not proof
+## An expired lease starts an investigation
 
-Once claimed, a supervisor records a 15-second lease and normally renews it every five seconds. The lease makes abandoned ownership detectable without requiring a shared daemon to monitor every job continuously.
+A claimed supervisor records a 15-second lease and normally renews it every five seconds. This makes abandoned ownership detectable without placing every job under a shared monitoring daemon.
 
-An expired lease does not prove that the supervisor is dead. The machine may have been suspended, the process may have paused between renewal and commit, or SQLite may have been temporarily busy. Reconciliation therefore verifies the stored process identity before changing the job.
+Expiration alone is weak evidence. A laptop may have slept, the process may have been paused between renewal and commit, or SQLite may have been busy. The stored process identity is checked before ownership is changed.
 
-That identity contains more than a PID. Where the platform provides it, Jobman records process creation identity, boot identity, and a separate target-tree identity. A PID can be reused; signaling or judging a new process based only on the old number would be unsafe.
+More than a PID is recorded. Where the operating system allows it, process creation identity and boot identity are stored, along with a separate identity for the target process tree. That extra evidence matters because PIDs are reused. A lease belonging to an old process must not authorize inspection or signaling of a new process that happens to have the same number.
 
-If Jobman can verify that an expired supervisor no longer owns a live process, it records the job as `lost` rather than inventing a target result. Version 1 does not attempt to adopt a target after its supervisor disappears. That is conservative, but it preserves the more important invariant: supervisor failure cannot be reported as fabricated success.
+When an expired supervisor can no longer be verified, the job is recorded as `lost`. No target exit code is invented. Target adoption after supervisor failure is not attempted in version 1; the uncertainty is surfaced instead.
 
-The platform-specific process-tree mechanics and timeout escalation deserve their own treatment. Here, the lease has a narrower purpose: it leaves durable evidence that ownership should be checked.
+That choice is conservative, and it leaves less room for a comforting but incorrect result. The process-tree mechanics used after a run starts are covered in [Part 4](/posts/inside-jobman-part-4/).
 
-## Why this much protocol?
+## The cost of avoiding a daemon
 
-Several simpler designs remove steps but also remove guarantees:
+A per-job supervisor consumes another process and datastore connection for every active or waiting job. A shared daemon could make ownership less elaborate because one long-lived process would already be present to accept submissions.
 
-- **Detach only the target.** Nothing remains to evaluate dependencies, drain output pipes, enforce retries, or reap the process.
-- **Keep the submitting CLI alive.** Closing its terminal makes job management unreliable and turns `run` into a foreground command.
-- **Use a shared daemon.** Ownership becomes simpler, but installation, upgrades, authorization, and unrelated-job failure isolation all change.
-- **Trust the child PID.** PID reuse and uncertain start state make later observation or signaling unsafe.
+That would be a different operational model. Installation and upgrades would need to account for a resident service; authorization would move to a daemon interface; and a fault in the shared process could affect unrelated jobs. Jobman accepts the per-job cost so each submission receives a bounded owner while jobs remain isolated from one another.
 
-The per-job supervisor costs an additional process and datastore connection for every active or waiting job. In return, it gives each job a bounded owner without introducing a resident service or shared in-memory scheduler.
+The launch credential has a similarly narrow job. It rejects stale, accidental, and competing claims. It is not intended as a security boundary against another process already running as the same operating-system user, which can generally access that user's files and processes.
 
-The launch credential is also intentionally narrow. It prevents stale, accidental, or competing supervisor claims. It is not a security boundary against another process already running as the same operating-system user, which can generally access that user's files and processes.
+## What the returned ID means
 
-## What acceptance guarantees
+By the time the analysis job ID is printed, its complete specification and dependencies have been committed, one supervisor has claimed it, and that supervisor's identity and initial lease have been recorded. A lost acknowledgement has also been checked against the datastore before success is reported.
 
-When `jobman run` prints the analysis job ID, Jobman has established that:
+None of this says that `python analyze_data.py` is running yet. The job may still be waiting for preparation to finish, for retry backoff to expire, or for concurrency capacity. The handoff establishes who is responsible. Eligibility is handled next.
 
-- the complete job specification and dependencies are durable;
-- exactly one supervisor has committed ownership;
-- the one-time credential can no longer be replayed;
-- the supervisor's identity and initial lease are recorded;
-- loss of the acknowledgement has been reconciled against durable state; and
-- later failure will be recorded as failure, loss, or another explicit outcome rather than inferred as success.
-
-It does not mean the analysis process has started. It may still be waiting for preparation to succeed, retry backoff to elapse, or concurrency capacity to become available. Acceptance transfers ownership; scheduling decides when a run is eligible.
-
-That distinction is the subject of [Part 3: Scheduling Without a Central Scheduler](/posts/inside-jobman-part-3/): how independent supervisors coordinate dependencies, waits, retry delays, and fair concurrency limits.
+[Part 3: Scheduling Without a Central Scheduler](/posts/inside-jobman-part-3/) follows the independent supervisors as dependencies, delays, retries, and concurrency limits are evaluated without a central scheduler.
 
 ---
 
