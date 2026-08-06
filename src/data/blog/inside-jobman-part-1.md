@@ -21,7 +21,7 @@ description: A technical introduction to Jobman's architecture through a real wo
 > [Part 3: Scheduling](/posts/inside-jobman-part-3/) ·
 > [Part 4: Process control and logs](/posts/inside-jobman-part-4/)
 
-**[Jobman](https://github.com/ryancswallace/jobman)** is a daemonless job manager for local background processes. I wrote it for work that has outgrown `nohup` and ad hoc shell scripts but does not justify a full-fledged service or distributed scheduler.
+**[Jobman](https://github.com/ryancswallace/jobman)** is a daemonless job manager for local background processes. Jobman was written for work that has outgrown `nohup` and ad hoc shell scripts but does not justify a full-fledged service or distributed scheduler.
 
 Jobman provides:
 
@@ -33,9 +33,9 @@ Jobman provides:
 | Reliability        | Retries, backoff, delays, and timeouts                  |
 | Coordination       | Inter-job dependencies and concurrency limits           |
 | Lifecycle control  | Status, wait, pause, resume, cancel, and rerun          |
-| Automation         | Versioned JSON and stable exit behavior                 |
+| Automation         | Versioned JSON and stable exit codes                    |
 
-There is no shared Jobman daemon. Completed jobs leave no supervisor or other processes running.
+In contrast to other job managers, there is no shared Jobman daemon or system service. Completed jobs leave no supervisor or other processes running.
 
 <figure>
   <video controls muted playsinline autoplay loop preload="metadata">
@@ -58,12 +58,14 @@ flowchart LR
     B -->|"exit 0"| E["Complete"]
 </div>
 
-I want four things from this workflow:
+There are four requirements for this workflow:
 
 - preparation and analysis should run in the background;
 - analysis must not start unless preparation succeeds;
 - a transient analysis failure should be retried;
 - each attempt's output and result should remain inspectable.
+
+Let's see how Jobman can satisfy these requirements.
 
 Submit the preparation step:
 
@@ -81,7 +83,7 @@ $ analyze_id=$(jobman run --after-success "$prepare_id" \
     -- python analyze_data.py)
 ```
 
-Those flags encode three decisions:
+The flags in the above command encode three policy decisions for the analysis job:
 
 | Option                          | Meaning                                                 |
 | ------------------------------- | ------------------------------------------------------- |
@@ -97,21 +99,45 @@ While the jobs run, inspect either one:
 
 ```console
 $ jobman status "$prepare_id"
+019fd6ef-055d-7490-bd56-3ca0641a9ead            running
+
 $ jobman status "$analyze_id"
+019fd6ef-3c98-7105-af83-35a8463f174a            waiting
 ```
 
 Wait for analysis to reach a terminal state:
 
 ```console
-$ jobman wait "$analyze_id"
+$ jobman wait "$analyze_id"  # blocks until completion of analyze job
+$ echo $?
+0
 ```
 
 `wait` is an observer, not an owner. Interrupting it does not cancel the job.
 
-After it finishes, `show` includes the complete run history:
+After it finishes, `show` output includes the complete run history:
 
 ```console
 $ jobman show "$analyze_id"
+ID:                       019fd6ef-3c98-7105-af83-35a8463f174a
+Name:
+Phase:                    completed
+Outcome:                  success
+Submitted:                2026-08-06T11:57:10.680058Z
+Executable:               python3
+Working directory:        /tmp/jobman-demo
+Completed runs:           1
+Successful runs:          1
+Failed runs:              0
+Dependencies:             1
+Wait evaluations:         0
+Admission:                released, global, 1 slot(s)
+Notification deliveries:  0
+Pending notifications:    0
+Notification attempts:    0
+
+RUN  PHASE      OUTCOME  STARTED                      COMPLETED                   LOGS
+1    completed  success  2026-08-06T11:57:56.938923Z  2026-08-06T11:58:57.19494Z  available
 ```
 
 The two output streams retain their identities:
@@ -127,20 +153,53 @@ result: 42
 For scripts, Jobman provides versioned JSON:
 
 ```console
-$ jobman show --json "$analyze_id"
+$ jobman show --json "$analyze_id" | jq
+{
+  "schema_version": 1,
+  "data": {
+    "admission": {
+      "acquired_at": "2026-08-06T11:57:56.93196Z",
+      "job_id": "019fd6ef-3c98-7105-af83-35a8463f174a",
+      "lease_expires_at": "2026-08-06T11:59:10.709521723Z",
+      "released_at": "2026-08-06T11:58:57.19494Z",
+      "run_id": "019fd6ef-f146-7d52-8101-d7596476b586",
+      "slots": 1
+    },
+    "claimed_at": "2026-08-06T11:57:10.706028Z",
+    "completed_at": "2026-08-06T11:58:57.19494Z",
+    "dependencies": [
+      {
+        "depends_on": "019fd6ef-055d-7490-bd56-3ca0641a9ead",
+        "job_id": "019fd6ef-3c98-7105-af83-35a8463f174a",
+        "observed_outcome": "success",
+        "observed_revision": 5,
+        "predicate": "success",
+        "satisfied_at": "2026-08-06T11:57:56.929663Z"
+      }
+    ],
+    "notification_attempts": [],
+...
+    "summary": {
+      "id": "019fd6ef-3c98-7105-af83-35a8463f174a",
+      "outcome": "success",
+      "phase": "completed",
+      "revision": 8,
+      "submitted_at": "2026-08-06T11:57:10.680058Z"
+    },
+    "wait_evaluations": []
+  }
+}
 ```
-
-Automation should retain the full job ID and consume JSON rather than parsing the human-readable tables.
 
 ## The ownership problem
 
-Detaching a process is straightforward, but managing it after detachment presents technical challenges.
+While detaching a process is straightforward, managing it after detachment presents technical challenges.
 
 Once the submitting CLI exits, some component must still:
 
 - evaluate dependencies and retry policy;
 - acquire concurrency capacity;
-- start and reap target processes;
+- start and reap the target processes;
 - capture stdout and stderr;
 - enforce timeout and cancellation policy;
 - commit lifecycle transitions;
@@ -172,11 +231,11 @@ With one supervisor per job, Jobman does not need:
 - a shared long-running failure domain;
 - privileged system integration;
 - daemon installation and upgrade coordination;
-- version skew between clients and a long-running service.
+- logic to handle version skew between clients and a long-running service.
 
-It still needs coordination: supervisors and CLI commands contend over the same datastore, so lifecycle changes use transactions and revision checks.
+However, Jobman still needs to manage coordination: supervisors and CLI commands contend over the same datastore, so lifecycle changes use transactions and revision checks.
 
-## Storage follows the data
+## Two data storage systems
 
 Metadata and logs put different demands on storage, so Jobman keeps them separate.
 
@@ -197,7 +256,7 @@ SQLite is a good fit for:
 - schema migration;
 - querying job history.
 
-Raw files are a better fit for potentially large byte streams. Keeping logs out of SQLite also means Jobman does not have to turn arbitrary process output into database rows.
+Raw files are a better fit for the potentially large byte streams of logs. Keeping logs out of SQLite also means Jobman does not have to turn arbitrary process output into database rows.
 
 The split also lets Jobman record two distinct facts:
 
@@ -206,7 +265,7 @@ The split also lets Jobman record two distinct facts:
 
 A logging failure does not rewrite a successful process exit as a failed execution. Jobman reports the target outcome and the integrity of its logs separately.
 
-## Direct execution is the default
+## Direct execution by default
 
 Everything after `--` is an executable and its argument vector. Jobman does not implicitly pass the command through a shell.
 
@@ -214,15 +273,17 @@ For a normal executable:
 
 ```console
 $ jobman run -- tar -xzf report.tar.gz
+019fd6f9-3ac1-7ab1-8fc0-534385d52c50
 ```
 
 Shell evaluation must be explicit:
 
 ```console
 $ jobman run -- sh -c 'generate | compress > report.tar.gz'
+019fd6f9-7695-7531-ac95-668028a91ed3
 ```
 
-Direct execution preserves argument boundaries. It also keeps shell quoting and command injection out of ordinary Jobman invocations.
+Direct execution preserves argument boundaries, and also keeps shell quoting and command injection out of ordinary Jobman invocations.
 
 ## Product boundary
 
@@ -237,13 +298,17 @@ Jobman is intentionally designed as a single-host (i.e., local) solution.
 | Durable local logs and state           | Remote log aggregation              |
 | Operation over an existing SSH session | A remote-control service            |
 
-A job _can_ survive the terminal or SSH connection that submitted it, it _may not_ survive the end of the operating system user session, and it _will not_ survive a system shutdown or reboot. Jobman does not purport to be a machine-level service manager.
+A Jobman job:
 
-This boundary keeps the tool useful without introducing all the complexities of a distributed system.
+- _will_ survive the terminal or SSH connection that submitted it;
+- _may not_ survive the end of the operating system user session, depending on OS configuration;
+- _will not_ survive a system shutdown or reboot.
+
+Jobman does not purport to be a machine-level service manager. This boundary keeps the tool useful without introducing all the complexities of a distributed system.
 
 ## Continue the series
 
-In [Part 2: Transferring Job Ownership to a Detached Supervisor](/posts/inside-jobman-part-2/), I trace the submission protocol from its first SQLite transaction through the detached supervisor claim, including what happens when the acknowledgement is lost.
+In [Part 2: Transferring Job Ownership to a Detached Supervisor](/posts/inside-jobman-part-2/), we trace the submission protocol from its first SQLite transaction through the detached supervisor claim, including what happens when the acknowledgement is lost.
 
 ---
 
