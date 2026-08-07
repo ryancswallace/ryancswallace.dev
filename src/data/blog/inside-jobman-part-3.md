@@ -24,7 +24,9 @@ description: How independent Jobman supervisors coordinate dependencies, waits, 
 
 [Part 2](/posts/inside-jobman-part-2/) stopped after ownership had been committed to a detached supervisor. The target command had not necessarily been started. Dependencies could still be active, a retry delay could be pending, or the configured concurrency limit could already be full.
 
-Consider the preparation and analysis pipeline from [Part 1](/posts/inside-jobman-part-1/), with the input now divided into four shards. All four analysis jobs depend on the same preparation job and use a pool with two slots:
+Consider the preparation and analysis pipeline from [Part 1](/posts/inside-jobman-part-1/), with the input now divided into four shards. All four analysis jobs depend on the same preparation job and use a pool with two slots.
+
+Excerpt from `jobman.yml` config file:
 
 ```yaml
 schema_version: 1
@@ -34,16 +36,18 @@ concurrency:
     analysis: 2
 ```
 
+Jobman analysis commands:
+
 ```console
 $ for shard in 1 2 3 4; do
-    jobman run --after-success "$prepare_id" \
+    jobman run --after-success prepare_data \
       --pool analysis --slots 1 \
       --retries 2 --retryable-exit-code 1 --retry-delay 1s \
       -- python analyze_data.py --shard "$shard"
   done
 ```
 
-Four supervisors are left waiting. When preparation succeeds, all four may observe that result within the same polling interval. Only two runs are allowed into the `analysis` pool.
+Four supervisors are left waiting. When preparation succeeds, all four may observe that result within the same polling interval, but only two runs are allowed into the `analysis` pool.
 
 No central Jobman process chooses the winners. Each supervisor attempts its own state transition against SQLite, and the transactions settle the race. The queue, slot allocations, retry deadlines, and evidence used to recover stale owners are all stored there. If a supervisor disappears, the scheduling record is left behind.
 
@@ -80,7 +84,7 @@ Long-running work is also kept out of SQLite transactions. A transaction records
 
 ## Recording dependency outcomes
 
-When `--after-success "$prepare_id"` is submitted, the selector is resolved immediately to a canonical job ID. Missing references, contradictory predicates, and dependency cycles are rejected before submission completes.
+When `--after-success prepare_data` is submitted, the selector is resolved immediately to a canonical job ID. Missing references, contradictory predicates, and dependency cycles are rejected before submission completes.
 
 The edge stores the required relationship:
 
@@ -111,19 +115,19 @@ Only after this stage is an admission requested.
 
 ## Racing for the last slot
 
-An eligible job requests a positive slot count. When a named pool is selected, those slots are charged against both the store-wide limit and the pool limit. Without a named pool, only the global limit is used.
+An eligible job requests a positive slot count. When a named pool is selected, those requested slots are charged against both the store-wide limit and the pool limit. Without a named pool, only the global limit is used.
 
 Requests that can never fit are rejected during submission. A three-slot request cannot run in the two-slot `analysis` pool, so no useful result would come from placing it in the queue.
 
 A request that fits in principle but not at the moment is different. Its durable queue position is created or reloaded during each acquisition attempt. In the same short transaction, active admissions are counted, the fairness rule is applied, and either a new admission is inserted or the request remains queued.
 
-This is the point at which the four shard supervisors meet. Suppose two slots have already been taken and the other two supervisors concurrently read an apparently available final slot. Their reads may overlap, but their writes cannot both commit on the same old state. SQLite serializes the admission transactions. The winner records its allocation; the other attempt observes the new usage or loses the compare-and-swap and stays queued.
+This is the point at which the four shard supervisors meet. Suppose two slots have already been taken and the other two supervisors concurrently read an apparently available final slot. Their reads may overlap, but their writes cannot both commit on the same old state. In this way, SQLite serializes the admission transactions. The winner records its allocation; the other attempt observes the new usage or loses the compare-and-swap and stays queued.
 
 After admission, the job enters `starting`. The allocation is bound to the run once that run has been reserved. A failed attempt leaves the original queue position intact instead of sending the job to the back.
 
-## Limiting queue bypasses to three
+## Fairness by limiting queue bypasses
 
-Strict first-in, first-out ordering behaves poorly when jobs request different numbers of slots. Suppose a pool has room for four:
+Strict first-in, first-out ordering behaves poorly when jobs request different numbers of slots. Suppose a pool has a capacity of 4 with this state:
 
 | Current state             | Slots |
 | ------------------------- | ----: |
@@ -132,11 +136,11 @@ Strict first-in, first-out ordering behaves poorly when jobs request different n
 | Younger queued request    |     1 |
 | Capacity currently unused |     2 |
 
-The three-slot request cannot start. Under strict FIFO, the one-slot request would also be blocked and two usable slots would sit idle. If every smaller request were always allowed through, the large request could instead be starved by a steady stream of short jobs.
+The three-slot request cannot start. Under strict FIFO, the one-slot request would also be blocked and two usable slots would sit idle. In contrast, if every smaller request were always allowed through, the large request could instead be starved by a steady stream of short jobs.
 
-A bounded bypass is used. When the oldest competing request does not fit, a younger request that does fit may be admitted. The older request's bypass counter is incremented in the same transaction. Once three bypasses have been recorded, younger competitors must wait for it.
+To ensure some notion of "fairness" in scheduling, Jobman uses a bounded bypass policy. When the oldest competing request does not fit, a younger request that does fit may be admitted. The older request's bypass counter is incremented in the same transaction. Once three bypasses have been recorded, younger competitors must wait for it.
 
-In reduced form:
+In pseudocode form:
 
 ```go
 older := oldestCompetingRequest(request)
@@ -154,41 +158,39 @@ incrementBypassCount(older)
 
 Competition is limited to shared finite scopes: the global limit, the same finite named pool, or both. Requests in unrelated pools are not ordered against one another just because their supervisors happen to poll at the same time.
 
-Initial order is based on the time prerequisites were satisfied, with the canonical job ID used to break ties. This is not weighted fair sharing, and no running job is preempted. The narrower goal is to allow some backfilling without making starvation unbounded.
+Initial order is based on the time prerequisites were satisfied, with the canonical job ID used to break ties. This is not weighted fair sharing, and no running job is preempted. The narrower goal is to allow some backfilling without allowing for potentially unlimited starvation of larger jobs.
 
 ## Expired leases do not release capacity
 
-Every admission has a lease that is renewed by its supervisor while the run is active. It would be tempting to treat the expiration timestamp as automatic capacity reclamation. That could violate the limit.
+Every admission has a lease that is renewed by its supervisor while the run is active. It would be tempting to treat the expiration timestamp as automatic capacity reclamation, but that could violate the limit.
 
 A laptop may have resumed from sleep, or a live supervisor may have been delayed while SQLite was busy. Its target could still be using the resource even though the lease is stale. If those slots were immediately reassigned, both the old and new runs would be counted as active outside the database while only one allocation appeared inside it.
 
 Expiration therefore starts reconciliation. The owning job, supervisor lease, and stored process identity are checked. Capacity is released after the owner is shown to be gone or the job has already completed. When identity cannot be verified safely, the allocation is left alone.
 
-The timestamp says when doubt is justified. It does not prove that a process has stopped.
-
 ## Release slots before retrying
 
-After a run ends, its result is classified as success, retryable failure, or non-retryable failure. Cancellation, whole-job timeout, success and failure counts, the run limit, and any retry deadline are then evaluated in a fixed order.
+After an individual run ends, its result is classified as success, retryable failure, or non-retryable failure. Cancellation, whole-job timeout, success and failure counts, the run limit, and any retry deadline are then evaluated in that order.
 
-The admission is released before another attempt is delayed or started. If the retry policy permits another run, constant, linear, or exponential delay is calculated with the configured cap and bounded jitter. An exact `next_run_at` timestamp is persisted for `backoff`; without a delay, the job returns directly to `queued`.
+The admission is released before another attempt is delayed or started. If the retry policy permits another run, constant, linear, or exponential delay is calculated with the configured cap and jitter. An exact `next_run_at` timestamp is persisted for `backoff`, whereas if the policy indicates no delay, the job returns directly to `queued`.
 
 No slot is held during backoff. Once the timestamp is reached, admission must be won again. A flaky shard therefore cannot occupy half of the analysis pool while it waits for its next attempt.
 
-The whole-job timeout continues across dependency waits, admission waits, and retry delays. A run timeout covers only one target invocation and can itself produce a retryable result. Actual termination belongs to the execution boundary described in Part 4; the scheduler only decides whether another run may follow.
+The whole-job timeout continues across dependency waits, admission waits, and retry delays. A run timeout covers only one target invocation and can itself produce a retryable result. Actual termination of the executable target belongs to the execution boundary described in Part 4; the scheduler only decides whether another run may follow.
 
 ## Why supervisors poll
 
-Without a resident scheduler, no shared condition variable is available when a dependency completes or a slot is returned. Supervisors check durable state at bounded intervals.
+Without a resident scheduler, no shared condition variable is available when a dependency completes or a slot is returned. Instead, supervisors check durable state at regular intervals.
 
-The ordinary interval is 100 milliseconds. Symmetric jitter between 90 and 110 percent is applied so the four shard supervisors do not keep waking in lockstep after being submitted together. Longer intervals can be configured for wait conditions, and backoff polling is bounded by the recorded eligibility time.
+The ordinary interval is 100 milliseconds. Uniform jitter between 90 and 110 percent is applied so the four shard supervisors do not keep waking in lockstep after being submitted together. Longer intervals can be configured for wait conditions, and backoff polling is bounded by the recorded eligibility time.
 
-Some database reads and up to a polling interval of scheduling latency are accepted here. In exchange, a missed in-memory wake-up cannot strand a job. After a restart, no queue has to be reconstructed from a scheduler process because the useful parts of that queue were already stored.
+Some database reads and up to one polling interval of scheduling latency are accepted here. In exchange, a missed in-memory wake-up cannot strand a job. After a restart, no queue has to be reconstructed from a scheduler process because the necessary parts of that queue were already stored.
 
-This trade is aimed at local jobs owned by one user on one machine. Thousands of remote workers or sub-millisecond dispatch would call for a different design.
+This tradeoff decision is aimed at Jobman's core use case: local jobs owned by one user on one machine. Thousands of remote workers or sub-millisecond dispatch would call for a different design.
 
 ## Durable scheduler state
 
-For the shard pipeline, the dependency revision says why each job became eligible. The prerequisites-satisfied timestamp preserves its initial place in line. Admission rows and bypass counts record who received capacity and who was allowed through. Leases identify allocations that deserve investigation. Retry timestamps keep policy from being reconstructed from process memory or log text.
+In summary, for the shard pipeline, the dependency revision says why each job became eligible. The prerequisites-satisfied timestamp preserves its initial place in line. Admission rows and bypass counts record who received capacity and who was allowed through. Leases identify allocations that deserve investigation. Retry timestamps keep policy from being reconstructed from process memory or log text.
 
 Each supervisor still acts for only one job. Coordination occurs where a shared fact must be changed, through a short transaction against those durable records. No supervisor is given authority to schedule the others.
 
