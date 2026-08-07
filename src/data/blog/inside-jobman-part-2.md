@@ -204,14 +204,3 @@ None of this says that `python analyze_data.py` is running yet. The job may stil
 **Next:** [Part 3: Scheduling Without a Central Scheduler](/posts/inside-jobman-part-3/)
 
 [View every Jobman article](/tags/jobman/)
-
-<script type="module">
-  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
-
-  mermaid.initialize({
-    startOnLoad: false,
-    theme: document.documentElement.dataset.theme === "dark" ? "dark" : "default",
-  });
-
-  await mermaid.run({ querySelector: ".mermaid" });
-</script>

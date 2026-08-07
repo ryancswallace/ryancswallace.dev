@@ -89,6 +89,10 @@
     pre {
       @apply focus-visible:border-transparent focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-dashed;
     }
+
+    .mermaid:not([data-processed="true"]) {
+      visibility: hidden;
+    }
   }
 
   /* ===== Code Blocks & Syntax Highlighting ===== */

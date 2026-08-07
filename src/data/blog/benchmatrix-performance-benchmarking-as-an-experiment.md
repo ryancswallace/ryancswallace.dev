@@ -325,14 +325,3 @@ A performance regression gate has two jobs:
 pytest-benchmark already provides a mature timing engine. benchmatrix builds the surrounding experiment: explicit matrix identity, independent process runs, adjacent matched blocks, balanced execution order, compatibility checks, evidence requirements, run-level intervals, multiplicity control, practical thresholds, and durable reports.
 
 The result is a workflow that can say why a conclusion is supported or why it is not and exactly which evidence produced the answer.
-
-<script type="module">
-  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
-
-  mermaid.initialize({
-    startOnLoad: false,
-    theme: document.documentElement.dataset.theme === "dark" ? "dark" : "default",
-  });
-
-  await mermaid.run({ querySelector: ".mermaid" });
-</script>

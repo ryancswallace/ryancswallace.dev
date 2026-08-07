@@ -286,3 +286,27 @@ const nextPost =
     window.scrollTo({ left: 0, top: 0, behavior: "instant" })
   );
 </script>
+
+<script>
+  async function renderMermaidDiagrams() {
+    const diagrams = Array.from(
+      document.querySelectorAll<HTMLElement>(
+        '.mermaid:not([data-processed="true"])'
+      )
+    );
+    if (diagrams.length === 0) return;
+
+    const { default: mermaid } = await import("mermaid");
+    mermaid.initialize({
+      startOnLoad: false,
+      theme:
+        document.documentElement.dataset.theme === "dark" ? "dark" : "default",
+    });
+
+    await mermaid.run({ nodes: diagrams });
+  }
+
+  document.addEventListener("astro:page-load", () => {
+    void renderMermaidDiagrams();
+  });
+</script>

@@ -491,14 +491,3 @@ For many research workflows, this is the useful middle ground: more reliable and
   </video>
   <figcaption>Basic Jobman command line behavior.</figcaption>
 </figure>
-
-<script type="module">
-  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
-
-  mermaid.initialize({
-    startOnLoad: false,
-    theme: document.documentElement.dataset.theme === "dark" ? "dark" : "default",
-  });
-
-  await mermaid.run({ querySelector: ".mermaid" });
-</script>

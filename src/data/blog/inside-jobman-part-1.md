@@ -315,14 +315,3 @@ In [Part 2: Transferring Job Ownership to a Detached Supervisor](/posts/inside-j
 **Next:** [Part 2: Transferring Job Ownership to a Detached Supervisor](/posts/inside-jobman-part-2/)
 
 [View every Jobman article](/tags/jobman/)
-
-<script type="module">
-  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
-
-  mermaid.initialize({
-    startOnLoad: false,
-    theme: document.documentElement.dataset.theme === "dark" ? "dark" : "default",
-  });
-
-  await mermaid.run({ querySelector: ".mermaid" });
-</script>
