@@ -112,10 +112,27 @@ Use `list` for an overview of active jobs:
 $ jobman list --active
 ```
 
+Potential output:
+
+```console
+ID                                    NAME   PHASE    OUTCOME  SUBMITTED
+019fdd39-751b-71c6-916f-06ade0f7a684         waiting           2026-08-07T17:15:58.107673Z
+019fdd39-5a8c-71a8-923c-3b81528037f7         waiting           2026-08-07T17:15:51.308744Z
+019fdd39-3be6-7e53-82bc-094f4a942544  model  waiting           2026-08-07T17:15:43.462936Z
+019fdd39-08f6-745c-95a7-5234c6e4aa49  clean  waiting           2026-08-07T17:15:30.423118Z
+019fdd38-e548-75bd-9a3e-560e6d0713fc  fetch  running           2026-08-07T17:15:21.288224Z
+```
+
 Use `status` for one job:
 
 ```console
 $ jobman status model
+```
+
+Potential output:
+
+```console
+019fdd39-3be6-7e53-82bc-094f4a942544    model   waiting
 ```
 
 Use `show` for the job specification and run history:
@@ -123,6 +140,32 @@ Use `show` for the job specification and run history:
 ```console
 $ jobman show model
 ```
+
+Potential output:
+
+```console
+ID:                       019fdd38-e548-75bd-9a3e-560e6d0713fc
+Name:                     fetch
+Phase:                    running
+Outcome:
+Submitted:                2026-08-07T17:15:21.288224Z
+Executable:               python
+Working directory:        /tmp/jobman-demo
+Completed runs:           0
+Successful runs:          0
+Failed runs:              0
+Dependencies:             0
+Wait evaluations:         0
+Admission:                active, global, 1 slot(s)
+Notification deliveries:  0
+Pending notifications:    0
+Notification attempts:    0
+
+RUN  PHASE    OUTCOME  STARTED                      COMPLETED  LOGS
+1    running           2026-08-07T17:15:21.368636Z             available
+```
+
+A summary of commands for inspecting jobs:
 
 | Subcommand   | Best use                       |
 | ------------ | ------------------------------ |
