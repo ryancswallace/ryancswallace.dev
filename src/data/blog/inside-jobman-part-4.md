@@ -184,7 +184,7 @@ After both drains finish, `Wait` is called, the files are closed and synced, aut
 | Run outcome      | `success`, `failure`, `timed_out`, `cancelled`, `start_failed`, `lost` |
 | Exit observation | Exit code, signal, or platform-specific reason                         |
 | Log integrity    | `pending`, `valid`, or `partial`                                       |
-| Recording health | `healthy` or `degraded`, with a diagnostic code                |
+| Recording health | `healthy` or `degraded`, with a diagnostic code                        |
 
 Suppose `analyze_data.py` exits zero just as the disk fills during stderr capture. The run can be stored as `success` while log integrity is `partial` and recording health is degraded. The reverse is also possible: valid logs do not alter a nonzero, non-retryable exit.
 
