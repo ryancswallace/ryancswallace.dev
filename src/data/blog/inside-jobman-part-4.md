@@ -23,7 +23,7 @@ description: How Jobman controls process trees across platforms, enforces cancel
 > [Part 3: Scheduling](/posts/inside-jobman-part-3/) ·
 > **Part 4: Process control and logs**
 
-[Part 3](/posts/inside-jobman-part-3/) left an analysis shard with a concurrency admission. A run can now be started. The remaining work sits at the operating-system boundary, where a process may create descendants, fill two output pipes at once, ignore a polite request to stop, or exit between inspection and a database commit.
+[Part 3](/posts/inside-jobman-part-3/) left an analysis shard with a concurrency admission. A run can now be started. The remaining work sits at the operating system boundary, where a process may create descendants, fill two output pipes at once, ignore a polite request to stop, or exit between inspection and a database commit.
 
 Suppose the admitted shard creates four worker processes. Progress is written to stdout, diagnostics are written to stderr, and a stuck worker must not survive the timeout:
 
@@ -121,7 +121,7 @@ The recorded outcome describes why Jobman stopped the run. Exit metadata separat
 
 ## Both pipes must keep moving
 
-The parent and its workers can write to stdout and stderr concurrently. Each operating-system pipe has a finite buffer. A straightforward loop that reads stdout to EOF and then starts on stderr can deadlock: a worker fills stderr, blocks before closing it, and the stdout reader waits forever for the process to finish.
+The parent and its workers can write to stdout and stderr concurrently. Each OS pipe has a finite buffer. A straightforward loop that reads stdout to EOF and then starts on stderr can deadlock: a worker fills stderr, blocks before closing it, and the stdout reader waits forever for the process to finish.
 
 One drain goroutine is started for each stream:
 
@@ -196,7 +196,7 @@ The separation also keeps crash recovery honest. If the supervisor vanishes whil
 
 For one analysis shard, a surprising amount of machinery sits between admission and completion. A run is reserved, a tree identity is established, stop intent is persisted, two streams are drained, and process and capture results are committed independently.
 
-Some behavior remains outside Jobman's control. A child can deliberately escape its process group, a graceful handler can perform external work before exiting, and ending the operating-system user session can terminate the supervisor. Those limits follow from the local, per-user model described in Part 1.
+Some behavior remains outside Jobman's control. A child can deliberately escape its process group, a graceful handler can perform external work before exiting, and ending the operating system user session can terminate the supervisor. Those limits follow from the local, per-user model described in Part 1.
 
 Inside that boundary, a stale PID is never treated as authority. Graceful and forced stops are directed at the managed tree. Index records are published only after their raw bytes, and log damage is not folded into the command's exit result.
 
