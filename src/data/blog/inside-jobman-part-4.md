@@ -37,7 +37,7 @@ $ shard_id=$(jobman run --after-success "$prepare_id" \
 
 Three facts will eventually need to be stored: which process tree may be controlled, how the target ended, and how much of its output was captured. They can disagree. A successful exit does not certify the logs, and a full log does not turn a failed command into a success. A PID, by itself, proves neither identity nor ownership.
 
-## A run record is created before a process
+## Reserve the run before launch
 
 After admission, a run ID and run number are allocated. A private log directory is created with stdout and stderr files, a chunk-order index, and an active-capture marker. The run is then committed in `starting`, and the existing admission is bound to it.
 
@@ -74,7 +74,7 @@ An uncomfortable interval still remains. The process exists before its identity 
 
 If the tree cannot be made manageable, it is terminated and reaped. If a verified identity cannot be published safely, the tree is terminated and ownership is recorded as lost. A live process is not left behind under a run that only appears to be controlled.
 
-## A remembered PID is too weak
+## Process identity beyond the PID
 
 The analysis parent may create four workers, which may create descendants of their own. Terminating only the parent can leave the workers running after Jobman has reported a cancellation or timeout.
 
@@ -94,7 +94,7 @@ The same operations are exposed on all three platforms—cancel, force, pause, a
 
 Before any of those operations, the process is inspected again. Creation and boot identity are compared in addition to the PID. If the stored identity no longer matches, control is refused. PIDs are reused routinely; an old Jobman record must never authorize a signal to whichever unrelated process received that number next.
 
-## A stop request is written down before it is sent
+## Persist stop intent before signaling
 
 When `jobman cancel` is used on the shard, cancellation intent is first committed to SQLite. The canceling client may then signal the revalidated tree immediately. The supervisor sees the same durable request, remains responsible for reaping the target, and commits the final run state.
 
@@ -119,7 +119,7 @@ On Unix, `SIGTERM` is sent to the process group and `SIGKILL` is used after the 
 
 The recorded outcome describes why Jobman stopped the run. Exit metadata separately describes what the operating system reported. Forced Job Object termination may be observed as exit code 1, for example, while the durable run outcome remains `timed_out` or `cancelled` and the platform reason is retained.
 
-## Both pipes must keep moving
+## Drain stdout and stderr concurrently
 
 The parent and its workers can write to stdout and stderr concurrently. Each OS pipe has a finite buffer. A straightforward loop that reads stdout to EOF and then starts on stderr can deadlock: a worker fills stderr, blocks before closing it, and the stdout reader waits forever for the process to finish.
 
@@ -139,7 +139,7 @@ The unusual-looking order in the last goroutine is deliberate. Both readers are 
 
 A stream is still drained when its capture has been disabled; the bytes are copied to `io.Discard`. The same fallback is used after a log write fails. Storage trouble is allowed to degrade the record, but it is not allowed to stop pipe consumption and freeze the target.
 
-## Raw bytes are kept separate
+## Separate files for stdout and stderr
 
 Stdout and stderr are stored in separate raw files. No UTF-8, line-ending, or newline assumption is made. Each stream remains independently readable even when the metadata used to combine them has been damaged.
 
@@ -155,7 +155,7 @@ Those two files cannot show how the streams were interleaved. A fixed-size chunk
 
 Only the order observed by Jobman is promised. If two workers write to different pipes at nearly the same time, the operating system exposes no portable causal ordering between them. Whichever chunk is appended first receives the next sequence number under a mutex.
 
-## The raw write is synced before its index entry
+## Sync log bytes before index records
 
 For each chunk, the raw bytes are written and synced before the corresponding index record is written and synced. The ordering is intentionally one-way: every valid index entry must refer to bytes that were already made durable.
 
@@ -165,7 +165,7 @@ Different treatment is given to different index failures. An incomplete final re
 
 This makes partial durability visible without turning every interrupted append into total log loss.
 
-## A segment limit preserves the prefix
+## Preserve the recorded log prefix
 
 When `--log-segment-bytes` is set, stdout and stderr rotate independently. Version 2 of the index includes a segment number for each stream while retaining one sequence across both.
 
@@ -175,7 +175,7 @@ The result is an honest prefix. Replacing early segments with a later window wou
 
 An `.active` marker is present while capture remains open. Retention cleanup uses it to avoid treating an in-progress directory as completed. Filesystem identity and containment are checked again before eligible logs are pruned, and the removal is reflected in metadata rather than appearing later as unexplained missing files.
 
-## Exit status and capture health may disagree
+## Process outcome and log health
 
 After both drains finish, `Wait` is called, the files are closed and synced, authoritative byte counts are measured, and the result is committed. Several dimensions are stored separately:
 
@@ -192,7 +192,7 @@ Automation can choose which fact it requires. Process success may be sufficient 
 
 The separation also keeps crash recovery honest. If the supervisor vanishes while capture is pending, the logs can be marked partial and the run can be marked lost. No result is inferred from the final log line, and a normal exit code is never used as proof that all output reached storage.
 
-## Where the boundary stops
+## Limits of process control
 
 For one analysis shard, a surprising amount of machinery sits between admission and completion. A run is reserved, a tree identity is established, stop intent is persisted, two streams are drained, and process and capture results are committed independently.
 

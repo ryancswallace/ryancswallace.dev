@@ -47,7 +47,7 @@ Four supervisors are left waiting. When preparation succeeds, all four may obser
 
 No central Jobman process chooses the winners. Each supervisor attempts its own state transition against SQLite, and the transactions settle the race. The queue, slot allocations, retry deadlines, and evidence used to recover stale owners are all stored there. If a supervisor disappears, the scheduling record is left behind.
 
-## Eligibility is checked before capacity
+## Eligibility before admission
 
 The word “queued” can obscure two separate situations. A job may be unable to run because a prerequisite is missing, or it may be ready but waiting for capacity. Those cases are kept separate in Jobman.
 
@@ -78,7 +78,7 @@ A file wait or dependency can last for hours. Capacity is not reserved during th
 
 Long-running work is also kept out of SQLite transactions. A transaction records a decision or an observation and closes. Sleeps, filesystem probes, and target processes are handled afterward.
 
-## A dependency edge becomes a receipt
+## Recording dependency outcomes
 
 When `--after-success "$prepare_id"` is submitted, the selector is resolved immediately to a canonical job ID. Missing references, contradictory predicates, and dependency cycles are rejected before submission completes.
 
@@ -99,7 +99,7 @@ A successful preparation satisfies all four shard edges. A failed preparation ma
 
 No completion message has to be delivered from one job to every dependent. If a notification were missed during a crash, extra recovery machinery would be needed. Here, the completed dependency is already durable and can be observed independently by each supervisor.
 
-## Files and probes pass through the same gate
+## Waiting on files and probes
 
 Some prerequisites do not belong to another Jobman job. A run may be held until an absolute time, for a delay after acceptance, until a filesystem path exists, or until an executable probe succeeds.
 
@@ -109,7 +109,7 @@ Dependencies and wait conditions are initial gates. After they have been satisfi
 
 Only after this stage is an admission requested.
 
-## One transaction decides the slot race
+## Racing for the last slot
 
 An eligible job requests a positive slot count. When a named pool is selected, those slots are charged against both the store-wide limit and the pool limit. Without a named pool, only the global limit is used.
 
@@ -121,7 +121,7 @@ This is the point at which the four shard supervisors meet. Suppose two slots ha
 
 After admission, the job enters `starting`. The allocation is bound to the run once that run has been reserved. A failed attempt leaves the original queue position intact instead of sending the job to the back.
 
-## The oldest request may be bypassed, three times
+## Limiting queue bypasses to three
 
 Strict first-in, first-out ordering behaves poorly when jobs request different numbers of slots. Suppose a pool has room for four:
 
@@ -156,7 +156,7 @@ Competition is limited to shared finite scopes: the global limit, the same finit
 
 Initial order is based on the time prerequisites were satisfied, with the canonical job ID used to break ties. This is not weighted fair sharing, and no running job is preempted. The narrower goal is to allow some backfilling without making starvation unbounded.
 
-## An expired lease does not manufacture a free slot
+## Expired leases do not release capacity
 
 Every admission has a lease that is renewed by its supervisor while the run is active. It would be tempting to treat the expiration timestamp as automatic capacity reclamation. That could violate the limit.
 
@@ -166,7 +166,7 @@ Expiration therefore starts reconciliation. The owning job, supervisor lease, an
 
 The timestamp says when doubt is justified. It does not prove that a process has stopped.
 
-## A retry gives up its seat
+## Release slots before retrying
 
 After a run ends, its result is classified as success, retryable failure, or non-retryable failure. Cancellation, whole-job timeout, success and failure counts, the run limit, and any retry deadline are then evaluated in a fixed order.
 
@@ -176,7 +176,7 @@ No slot is held during backoff. Once the timestamp is reached, admission must be
 
 The whole-job timeout continues across dependency waits, admission waits, and retry delays. A run timeout covers only one target invocation and can itself produce a retryable result. Actual termination belongs to the execution boundary described in Part 4; the scheduler only decides whether another run may follow.
 
-## Polling is used on purpose
+## Why supervisors poll
 
 Without a resident scheduler, no shared condition variable is available when a dependency completes or a slot is returned. Supervisors check durable state at bounded intervals.
 
@@ -186,7 +186,7 @@ Some database reads and up to a polling interval of scheduling latency are accep
 
 This trade is aimed at local jobs owned by one user on one machine. Thousands of remote workers or sub-millisecond dispatch would call for a different design.
 
-## The queue survives its supervisors
+## Durable scheduler state
 
 For the shard pipeline, the dependency revision says why each job became eligible. The prerequisites-satisfied timestamp preserves its initial place in line. Admission rows and bypass counts record who received capacity and who was allowed through. Leases identify allocations that deserve investigation. Retry timestamps keep policy from being reconstructed from process memory or log text.
 

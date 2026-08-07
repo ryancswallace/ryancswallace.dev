@@ -93,7 +93,7 @@ The flags in the above command encode three policy decisions for the analysis jo
 
 The policy is stored before the background supervisor begins evaluating it. A later CLI invocation does not have to reconstruct the pipeline from shell history.
 
-## Inspecting the job
+## Inspecting jobs and runs
 
 While the jobs run, inspect either one:
 
@@ -191,7 +191,7 @@ $ jobman show --json "$analyze_id" | jq
 }
 ```
 
-## The ownership problem
+## Who owns the job after submission?
 
 While detaching a process is straightforward, managing it after detachment presents technical challenges.
 
@@ -265,7 +265,7 @@ The split also lets Jobman record two distinct facts:
 
 A logging failure does not rewrite a successful process exit as a failed execution. Jobman reports the target outcome and the integrity of its logs separately.
 
-## Direct execution by default
+## Commands run without a shell
 
 Everything after `--` is an executable and its argument vector. Jobman does not implicitly pass the command through a shell.
 
@@ -285,7 +285,7 @@ $ jobman run -- sh -c 'generate | compress > report.tar.gz'
 
 Direct execution preserves argument boundaries, and also keeps shell quoting and command injection out of ordinary Jobman invocations.
 
-## Product boundary
+## Where Jobman's guarantees end
 
 Jobman is intentionally designed as a single-host (i.e., local) solution.
 
@@ -306,7 +306,7 @@ A Jobman job:
 
 Jobman does not purport to be a machine-level service manager. This boundary keeps the tool useful without introducing all the complexities of a distributed system.
 
-## Continue the series
+## Next: ownership transfer
 
 In [Part 2: Transferring Job Ownership to a Detached Supervisor](/posts/inside-jobman-part-2/), we trace the submission protocol from its first SQLite transaction through the detached supervisor claim, including what happens when the acknowledgement is lost.
 

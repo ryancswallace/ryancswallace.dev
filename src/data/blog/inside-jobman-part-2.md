@@ -38,7 +38,7 @@ The handoff is challenging: on one side is a SQLite transaction, and on the othe
 
 Jobman's ownership transfer protocol was designed to mitigate these issues. In particular, if the handoff is interrupted, enough state must remain to know whether or not the job was actually accepted.
 
-## The transaction ends at the process boundary
+## SQLite cannot commit a process launch
 
 Two durable transitions are separated by the supervisor launch:
 
@@ -69,7 +69,7 @@ No lock is held across the entire sequence. Holding a SQLite transaction open wh
 
 Instead, the job is written first. The supervisor is then launched and asked to claim the durable record. Each step has a state that can be recognized after a crash.
 
-## The job is written before its owner exists
+## Persist the job before launching the supervisor
 
 Before the supervisor is started, the effective configuration is resolved into an immutable job specification. The executable and argument vector, working directory, environment policy, retry and timeout settings, dependency IDs, and logging policy are all included. The supervisor will load that record later rather than reconstructing policy from the launch command.
 
@@ -103,7 +103,7 @@ If the CLI dies immediately afterward, an ownerless `submitting` record is left 
 
 Note also that only the credential hash is persisted. The plaintext bytes are held briefly by the CLI and passed to the supervisor through an inherited stdin pipe. They are kept out of command-line arguments, environment variables, logs, and the database.
 
-## The hidden supervisor mode command
+## The private `__supervise` command
 
 The supervisor is started by invoking the Jobman executable again with its private `__supervise` command. Only the non-secret job ID is placed on its command line. The analysis command, working directory, dependencies, and policy are read from the committed job specification.
 
@@ -118,7 +118,7 @@ The Go context is detached as well. `context.WithoutCancel` is used when the sup
 
 The private command is kept deliberately narrow. It cannot be used to replace the stored executable or supply a different log path. Its only input is a job ID (via the command line) plus proof that it was launched for the pending submission (via the launch credential on stdin).
 
-## Ownership is claimed once
+## A single-use ownership claim
 
 After reading the credential, the supervisor opens the datastore, assigns itself a UUIDv7 ID, and inspects its OS process identity. A claim is accepted only while the job remains in `submitting`, the deadline is still open, the credential hash matches, and the expected job revision is current.
 
@@ -141,7 +141,7 @@ This is handled as optimistic concurrency. Mutable records carry monotonically i
 
 No long-held application lock is needed, and a stale supervisor is prevented from overwriting work committed by a newer process.
 
-## A broken pipe does not answer the question
+## Recovering a lost claim acknowledgement
 
 Once the claim is committed, a small JSON acknowledgement is written by the supervisor. It contains a schema version, job ID, and supervisor ID. Its size is limited, unknown fields are rejected, and both identifiers are checked by the CLI.
 
@@ -169,7 +169,7 @@ The crash windows can be read directly from the durable state:
 
 The last two cases cannot guarantee that the shell captured the printed ID. A canonical ID and owner have still been committed, so the job can be found with later Jobman commands.
 
-## An expired lease starts an investigation
+## What an expired supervisor lease proves
 
 A claimed supervisor records a 15-second lease and normally renews it every five seconds. This makes abandoned ownership detectable without placing every job under a shared monitoring daemon.
 
@@ -181,7 +181,7 @@ When an expired supervisor can no longer be verified, the job is recorded as `lo
 
 This is a conservative design choice, and it leaves less room for a comforting but incorrect result. The process-tree mechanics used after a run starts are covered in [Part 4](/posts/inside-jobman-part-4/).
 
-## The cost of avoiding a daemon
+## The per-job supervisor tradeoff
 
 A per-job supervisor consumes another process and datastore connection for every active or waiting job. A shared daemon could make ownership less elaborate because one long-lived process would already be present to accept submissions.
 
@@ -189,7 +189,7 @@ That would be a different operational model. Installation and upgrades would nee
 
 The launch credential has a similarly narrow job. It rejects stale, accidental, and competing claims. It is not intended as a security boundary against another process already running as the same OS user, which can generally access that user's files and processes.
 
-## What the returned ID means
+## What a returned job ID guarantees
 
 By the time the analysis job ID is printed, its complete specification and dependencies have been committed, one supervisor has claimed it, and that supervisor's identity and initial lease have been recorded. A lost acknowledgement has also been checked against the datastore before success is reported.
 
