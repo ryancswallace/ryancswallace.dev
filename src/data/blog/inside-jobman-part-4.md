@@ -23,19 +23,19 @@ description: How Jobman controls process trees across platforms, enforces cancel
 > [Part 3: Scheduling](/posts/inside-jobman-part-3/) ·
 > **Part 4: Process control and logs**
 
-[Part 3](/posts/inside-jobman-part-3/) left an analysis shard with a concurrency admission. A run can now be started. The remaining work sits at the operating system boundary, where a process may create descendants, fill two output pipes at once, ignore a polite request to stop, or exit between inspection and a database commit.
+[Part 3](/posts/inside-jobman-part-3/) left an analysis shard with a concurrency admission. A run can now be started. The remaining work is at the operating system interface, where a process may create descendants, fill two output pipes at once, ignore a polite request to stop, or exit between inspection and a database commit.
 
 Suppose the admitted shard creates four worker processes. Progress is written to stdout, diagnostics are written to stderr, and a stuck worker must not survive the timeout:
 
 ```console
-$ shard_id=$(jobman run --after-success "$prepare_id" \
+$ shard_id=$(jobman run --after-success prepare_data \
     --pool analysis --slots 1 \
     --run-timeout 15m --stop-grace 5s \
     --log-segment-bytes 16MiB --log-segments 8 \
     -- python analyze_data.py --shard 3 --workers 4)
 ```
 
-Three facts will eventually need to be stored: which process tree may be controlled, how the target ended, and how much of its output was captured. They can disagree. A successful exit does not certify the logs, and a full log does not turn a failed command into a success. A PID, by itself, proves neither identity nor ownership.
+Three facts will eventually need to be stored: which process tree may be controlled, how the target ended, and how much of its output was captured.
 
 ## Reserve the run before launch
 
@@ -51,7 +51,7 @@ sequenceDiagram
     participant T as Target tree
     S->>L: Create private run files and active marker
     S->>DB: Reserve run and bind admission
-    S->>T: Start direct executable in a tree boundary
+    S->>T: Start direct executable in a new process tree
     S->>T: Inspect process and finalize tree identity
     S->>DB: Commit running phase and process identity
     par Capture stdout
@@ -66,9 +66,9 @@ sequenceDiagram
     S->>DB: Commit exit, outcome, and log integrity
 </div>
 
-This ordering leaves somewhere to record a failed `Start`. Executable resolution may fail, permissions may be wrong, or the operating system may reject the launch. In those cases, a `start_failed` run is committed instead of leaving a missing attempt in the job history. Retry policy may allow another attempt.
+This ordering leaves somewhere to record a failed `Start`. Executable resolution may fail, permissions may be wrong, or the operating system may reject the launch. In those cases, a `start_failed` run is committed instead of leaving a missing attempt in the job history. The retry policy may allow another attempt.
 
-Everything after `--` remains an executable plus an argument vector. Resolution is performed against the stored working directory and environment; no shell command is assembled behind the scenes. Stdin is attached according to policy, and stdout and stderr are given separate pipes.
+Everything after `--` is interpreted as an executable plus an argument vector. Resolution is performed against the stored working directory and environment; no shell command is assembled behind the scenes. Stdin is attached according to policy, and stdout and stderr are given separate pipes.
 
 An uncomfortable interval still remains. The process exists before its identity can be committed. During that interval, the platform-specific tree boundary is established and the process is inspected. The run is moved from `starting` to `running` only after that setup succeeds.
 
@@ -92,7 +92,7 @@ The Windows setup has more moving parts. The target is created suspended, assign
 
 The same operations are exposed on all three platforms—cancel, force, pause, and resume—but their implementations are intentionally different.
 
-Before any of those operations, the process is inspected again. Creation and boot identity are compared in addition to the PID. If the stored identity no longer matches, control is refused. PIDs are reused routinely; an old Jobman record must never authorize a signal to whichever unrelated process received that number next.
+Before any of those operations, the process is inspected again. Creation and boot identity are compared in addition to the PID. If the stored identity no longer matches, control is refused. PIDs are reused routinely, so an old Jobman record must never authorize a signal to whichever unrelated process received that number next.
 
 ## Persist stop intent before signaling
 
@@ -117,13 +117,13 @@ flowchart LR
 
 On Unix, `SIGTERM` is sent to the process group and `SIGKILL` is used after the grace period when forced termination is enabled. On Windows, `CTRL_BREAK_EVENT` is attempted for the graceful step. That signal is best effort because the detached supervisor may not share the target's console. Job Object termination supplies the reliable forced stop.
 
-The recorded outcome describes why Jobman stopped the run. Exit metadata separately describes what the operating system reported. Forced Job Object termination may be observed as exit code 1, for example, while the durable run outcome remains `timed_out` or `cancelled` and the platform reason is retained.
+The recorded outcome describes why Jobman stopped the run. Exit metadata separately describes what the OS reported. Forced Job Object termination may be observed as exit code 1, for example, while the durable run outcome remains `timed_out` or `cancelled` and the platform reason is retained.
 
 ## Drain stdout and stderr concurrently
 
 The parent and its workers can write to stdout and stderr concurrently. Each OS pipe has a finite buffer. A straightforward loop that reads stdout to EOF and then starts on stderr can deadlock: a worker fills stderr, blocks before closing it, and the stdout reader waits forever for the process to finish.
 
-One drain goroutine is started for each stream:
+To avoid this issue, one drain goroutine is started for each stream:
 
 ```go
 go drainPipe(stdout, capture, logstore.Stdout)
@@ -135,15 +135,15 @@ go func() {
 }()
 ```
 
-The unusual-looking order in the last goroutine is deliberate. Both readers are allowed to finish before `Wait` is called. If `Wait` closes an `os/exec` pipe while a reader is still consuming its final bytes, those bytes can be lost and capture may be reported as degraded even though the target exited normally.
+The unusual-looking order in the last goroutine is intentional. Both readers are allowed to finish before `Wait` is called. If `Wait` closes an `os/exec` pipe while a reader is still consuming its final bytes, those bytes can be lost and capture may be reported as degraded even though the target exited normally.
 
-A stream is still drained when its capture has been disabled; the bytes are copied to `io.Discard`. The same fallback is used after a log write fails. Storage trouble is allowed to degrade the record, but it is not allowed to stop pipe consumption and freeze the target.
+A stream is still drained when its capture has been disabled; the bytes are copied to `io.Discard`. The same fallback is used after a log write fails. As such, storage issues are allowed to degrade the record but not allowed to stop pipe consumption and freeze the target.
 
 ## Separate files for stdout and stderr
 
 Stdout and stderr are stored in separate raw files. No UTF-8, line-ending, or newline assumption is made. Each stream remains independently readable even when the metadata used to combine them has been damaged.
 
-Those two files cannot show how the streams were interleaved. A fixed-size chunk index is written alongside them. Each 52-byte record contains:
+Those two files alone cannot show how the streams were interleaved. A fixed-size chunk index is written alongside them. Each 52-byte record contains:
 
 | Field                       | Purpose                                               |
 | --------------------------- | ----------------------------------------------------- |
@@ -153,13 +153,13 @@ Those two files cannot show how the streams were interleaved. A fixed-size chunk
 | Timestamp                   | Record when the supervisor observed the chunk         |
 | CRC-32C                     | Detect a corrupt complete record                      |
 
-Only the order observed by Jobman is promised. If two workers write to different pipes at nearly the same time, the operating system exposes no portable causal ordering between them. Whichever chunk is appended first receives the next sequence number under a mutex.
+Only the order observed by Jobman is promised. If two workers write to different pipes at nearly the same time, the operating system exposes no definite ordering between them. Whichever chunk is appended first receives the next sequence number under a mutex.
 
 ## Sync log bytes before index records
 
 For each chunk, the raw bytes are written and synced before the corresponding index record is written and synced. The ordering is intentionally one-way: every valid index entry must refer to bytes that were already made durable.
 
-A crash between those two syncs leaves a less tidy case. Raw bytes may exist without an index entry. They are still available when stdout or stderr is read separately, but their position relative to the other stream cannot be recovered. Combined output omits that unindexed tail and reports the condition rather than inventing an order.
+A crash between those two syncs leaves an inconsistent log store: raw bytes may exist without an index entry. They are still available when stdout or stderr is read separately, but their position relative to the other stream cannot be recovered. Combined output omits that unindexed tail and reports the condition rather than inventing an order.
 
 Different treatment is given to different index failures. An incomplete final record is accepted as a torn crash tail and ignored. A complete record with a bad checksum, a sequence gap, or a byte range outside the raw file is reported as corruption. The complete index snapshot is validated before combined output is copied to the caller.
 
@@ -167,11 +167,11 @@ This makes partial durability visible without turning every interrupted append i
 
 ## Preserve the recorded log prefix
 
-When `--log-segment-bytes` is set, stdout and stderr rotate independently. Version 2 of the index includes a segment number for each stream while retaining one sequence across both.
+When `--log-segment-bytes` is set, stdout and stderr rotate independently. The index includes a segment number for each stream while retaining one sequence across both.
 
-No old segment is deleted to make space during capture. Once the configured segment count has been reached, recording becomes degraded and previously written segments are left intact. Pipe draining continues so the target can exit.
+Old segments are not deleted to make space during capture. Once the configured segment count has been reached, recording becomes degraded and previously written segments are left intact. Pipe draining continues so the target can exit.
 
-The result is an honest prefix. Replacing early segments with a later window would either require index history to be rewritten or make a suffix look like the complete stream.
+The result is an intact prefix. Replacing early segments with a later window would either require index history to be rewritten or make a suffix look like the complete stream.
 
 An `.active` marker is present while capture remains open. Retention cleanup uses it to avoid treating an in-progress directory as completed. Filesystem identity and containment are checked again before eligible logs are pruned, and the removal is reflected in metadata rather than appearing later as unexplained missing files.
 
@@ -184,23 +184,21 @@ After both drains finish, `Wait` is called, the files are closed and synced, aut
 | Run outcome      | `success`, `failure`, `timed_out`, `cancelled`, `start_failed`, `lost` |
 | Exit observation | Exit code, signal, or platform-specific reason                         |
 | Log integrity    | `pending`, `valid`, or `partial`                                       |
-| Recording health | `healthy` or `degraded`, with a bounded diagnostic code                |
+| Recording health | `healthy` or `degraded`, with a diagnostic code                |
 
-Suppose `analyze_data.py` exits zero just as the disk fills during stderr capture. The run can be stored as `success` while log integrity is `partial` and recording health is degraded. The reverse is also possible: pristine logs do not alter a nonzero, non-retryable exit.
+Suppose `analyze_data.py` exits zero just as the disk fills during stderr capture. The run can be stored as `success` while log integrity is `partial` and recording health is degraded. The reverse is also possible: valid logs do not alter a nonzero, non-retryable exit.
 
 Automation can choose which fact it requires. Process success may be sufficient for one workflow, while another may reject a result unless complete logs were retained. Degraded capture can be alerted on without rewriting the target's actual outcome.
 
-The separation also keeps crash recovery honest. If the supervisor vanishes while capture is pending, the logs can be marked partial and the run can be marked lost. No result is inferred from the final log line, and a normal exit code is never used as proof that all output reached storage.
-
 ## Limits of process control
 
-For one analysis shard, a surprising amount of machinery sits between admission and completion. A run is reserved, a tree identity is established, stop intent is persisted, two streams are drained, and process and capture results are committed independently.
+A surprising amount of machinery operates between admission and completion for a single analysis shard. A run is reserved, a tree identity is established, stop intent is persisted, two streams are drained, and process and capture results are committed independently.
 
-Some behavior remains outside Jobman's control. A child can deliberately escape its process group, a graceful handler can perform external work before exiting, and ending the operating system user session can terminate the supervisor. Those limits follow from the local, per-user model described in Part 1.
+Nevertheless, some behavior remains outside Jobman's control. A child can deliberately escape its process group, a graceful handler can perform external work before exiting, and ending the operating system user session can terminate the supervisor. Those limits follow from the local, per-user model described in Part 1.
 
-Inside that boundary, a stale PID is never treated as authority. Graceful and forced stops are directed at the managed tree. Index records are published only after their raw bytes, and log damage is not folded into the command's exit result.
+Within those limitations, a stale PID is never treated as authority. Graceful and forced stops are directed at the managed tree. Index records are published only after their raw bytes, and log damage is not folded into the command's exit result.
 
-Those rules finish the path started with submission: ownership was transferred in Part 2, capacity was assigned in Part 3, and the final run record now states only what could actually be observed.
+Those rules finish the path started with submission: Part 2 described ownership was transferred, Part 3 covered capacity assignment, and the final run record now states only what could actually be observed.
 
 ---
 
