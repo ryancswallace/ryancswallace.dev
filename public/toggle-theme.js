@@ -1,11 +1,67 @@
 const primaryColorScheme = ""; // "light" | "dark"
+const storageKey = "theme";
+const sharedCookieName = "rw-theme";
+const sharedCookieDomain = "ryancswallace.dev";
+const sharedCookieMaxAge = 60 * 60 * 24 * 365;
 
-// Get theme data from local storage
-const currentTheme = localStorage.getItem("theme");
+function isTheme(value) {
+  return value === "light" || value === "dark";
+}
+
+function getSharedTheme() {
+  const cookie = document.cookie
+    .split(";")
+    .map(value => value.trim())
+    .find(value => value.startsWith(`${sharedCookieName}=`));
+  const value = cookie?.slice(sharedCookieName.length + 1);
+
+  return isTheme(value) ? value : null;
+}
+
+function getLocalTheme() {
+  try {
+    const value = localStorage.getItem(storageKey);
+    return isTheme(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function setLocalTheme(theme) {
+  try {
+    localStorage.setItem(storageKey, theme);
+  } catch {
+    // The shared cookie still preserves the preference when storage is unavailable.
+  }
+}
+
+function setSharedTheme(theme) {
+  document.cookie = `${sharedCookieName}=${theme}; Path=/; Domain=${sharedCookieDomain}; Max-Age=${sharedCookieMaxAge}; SameSite=Lax; Secure`;
+}
+
+function getSavedTheme() {
+  return getSharedTheme() || getLocalTheme();
+}
+
+function saveTheme(theme) {
+  setLocalTheme(theme);
+  setSharedTheme(theme);
+}
+
+const sharedTheme = getSharedTheme();
+const localTheme = getLocalTheme();
+
+if (sharedTheme) {
+  setLocalTheme(sharedTheme);
+} else if (localTheme) {
+  // Migrate the existing origin-specific preference to both sites.
+  saveTheme(localTheme);
+}
 
 function getPreferTheme() {
-  // return theme value in local storage if it is set
-  if (currentTheme) return currentTheme;
+  // Return the shared or legacy origin-specific preference if it is set.
+  const savedTheme = getSavedTheme();
+  if (savedTheme) return savedTheme;
 
   // return primary color scheme if it is set
   if (primaryColorScheme) return primaryColorScheme;
@@ -19,7 +75,7 @@ function getPreferTheme() {
 let themeValue = getPreferTheme();
 
 function setPreference() {
-  localStorage.setItem("theme", themeValue);
+  saveTheme(themeValue);
   reflectPreference();
 }
 
@@ -67,6 +123,19 @@ window.onload = () => {
   document.addEventListener("astro:after-swap", setThemeFeature);
 };
 
+function syncSharedTheme() {
+  const latestTheme = getSharedTheme();
+
+  if (latestTheme && latestTheme !== themeValue) {
+    themeValue = latestTheme;
+    setLocalTheme(themeValue);
+    reflectPreference();
+  }
+}
+
+window.addEventListener("focus", syncSharedTheme);
+window.addEventListener("pageshow", syncSharedTheme);
+
 // Set theme-color value before page transition
 // to avoid navigation bar color flickering in Android dark mode
 document.addEventListener("astro:before-swap", event => {
@@ -83,6 +152,8 @@ document.addEventListener("astro:before-swap", event => {
 window
   .matchMedia("(prefers-color-scheme: dark)")
   .addEventListener("change", ({ matches: isDark }) => {
-    themeValue = isDark ? "dark" : "light";
-    setPreference();
+    if (!getSavedTheme()) {
+      themeValue = isDark ? "dark" : "light";
+      reflectPreference();
+    }
   });
