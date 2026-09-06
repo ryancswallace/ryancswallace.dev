@@ -11,11 +11,12 @@ import { SITE } from "@/config";
 
 const { pathname } = Astro.url;
 
-// Remove trailing slash from current pathname if exists
 const currentPath =
   pathname.endsWith("/") && pathname !== "/" ? pathname.slice(0, -1) : pathname;
 
 const isActive = (path: string) => {
+  if (path === "/") return currentPath === "/";
+
   const currentPathArray = currentPath.split("/").filter(p => p.trim());
   const pathArray = path.split("/").filter(p => p.trim());
 
@@ -23,7 +24,7 @@ const isActive = (path: string) => {
 };
 ---
 
-<header>
+<header class="font-mono">
   <a
     id="skip-to-content"
     href="#main-content"
@@ -33,59 +34,64 @@ const isActive = (path: string) => {
   </a>
   <div
     id="nav-container"
-    class="mx-auto flex max-w-app flex-col items-center justify-between sm:flex-row"
+    class="mx-auto flex max-w-site items-center justify-between"
   >
     <div
       id="top-nav-wrap"
-      class="relative flex w-full items-baseline justify-between bg-background p-4 sm:items-center sm:py-6"
+      class="relative flex w-full items-center justify-between bg-background px-4 py-4 sm:py-6"
     >
       <a
         href="/"
-        class="absolute py-1 text-xl leading-8 font-semibold whitespace-nowrap sm:static sm:my-auto sm:text-2xl sm:leading-none"
+        class="py-1 text-xl leading-8 font-semibold whitespace-nowrap sm:text-2xl sm:leading-none"
       >
         {SITE.title}
       </a>
-      <nav
-        id="nav-menu"
-        class="flex w-full flex-col items-center sm:ms-2 sm:flex-row sm:justify-end sm:space-x-4 sm:py-0"
-      >
+
+      <nav id="nav-menu" class="ms-2 flex items-center justify-end">
         <button
           id="menu-btn"
-          class="focus-outline self-end p-2 sm:hidden"
-          aria-label="Open Menu"
+          class="focus-outline p-2 sm:hidden"
+          aria-label="Open menu"
           aria-expanded="false"
           aria-controls="menu-items"
         >
           <IconX id="close-icon" class="hidden" />
           <IconMenuDeep id="menu-icon" />
         </button>
+
         <ul
           id="menu-items"
           class:list={[
-            "mt-4 grid w-44 grid-cols-2 place-content-center gap-2",
-            "[&>li>a]:block [&>li>a]:px-4 [&>li>a]:py-3 [&>li>a]:text-center [&>li>a]:font-medium [&>li>a]:hover:text-accent sm:[&>li>a]:px-2 sm:[&>li>a]:py-1",
-            "hidden",
-            "sm:mt-0 sm:flex sm:w-auto sm:gap-x-5 sm:gap-y-0",
+            "absolute top-full right-4 z-50 mt-1 hidden w-60 grid-cols-2 gap-1 rounded-lg border border-border bg-background p-3 shadow-xl",
+            "[&>li>a]:block [&>li>a]:rounded-md [&>li>a]:px-3 [&>li>a]:py-2.5 [&>li>a]:text-center [&>li>a]:text-sm [&>li>a]:font-medium [&>li>a]:hover:bg-muted/40 [&>li>a]:hover:text-accent",
+            "sm:static sm:flex sm:w-auto sm:items-center sm:gap-x-3 sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none",
+            "sm:[&>li>a]:px-2 sm:[&>li>a]:py-1",
           ]}
         >
-          <li class="col-span-2">
+          <li class="col-span-2 sm:col-span-1">
+            <a
+              href="/#selected-work"
+              class:list={{ "active-nav": isActive("/") }}
+            >
+              Work
+            </a>
+          </li>
+          <li class="col-span-2 sm:col-span-1">
             <a href="/posts" class:list={{ "active-nav": isActive("/posts") }}>
-              Posts
+              Writing
             </a>
           </li>
-          <li class="col-span-2">
-            <a href="/tags" class:list={{ "active-nav": isActive("/tags") }}>
-              Tags
-            </a>
-          </li>
-          <li class="col-span-2">
+          <li class="col-span-2 sm:col-span-1">
             <a href="/about" class:list={{ "active-nav": isActive("/about") }}>
               About
             </a>
           </li>
+          <li class="col-span-2 sm:col-span-1">
+            <a href="https://resume.ryancswallace.dev">Résumé</a>
+          </li>
           {
             SITE.showArchives && (
-              <li class="col-span-2">
+              <li class="col-span-2 sm:col-span-1">
                 <LinkButton
                   href="/archives"
                   class:list={[
@@ -94,7 +100,7 @@ const isActive = (path: string) => {
                       "active-nav [&>svg]:stroke-accent": isActive("/archives"),
                     },
                   ]}
-                  ariaLabel="archives"
+                  ariaLabel="Archives"
                   title="Archives"
                 >
                   <IconArchive class="hidden sm:inline-block" />
@@ -110,7 +116,7 @@ const isActive = (path: string) => {
                 "focus-outline flex p-3 sm:p-1",
                 { "[&>svg]:stroke-accent": isActive("/search") },
               ]}
-              ariaLabel="search"
+              ariaLabel="Search"
               title="Search"
             >
               <IconSearch />
@@ -123,9 +129,10 @@ const isActive = (path: string) => {
                 <button
                   id="theme-btn"
                   class="focus-outline relative size-12 p-4 sm:size-8 hover:[&>svg]:stroke-accent"
-                  title="Toggles light & dark"
-                  aria-label="auto"
+                  title="Switch theme"
+                  aria-label="Switch theme"
                   aria-live="polite"
+                  aria-pressed="false"
                 >
                   <IconMoon class="absolute top-[50%] left-[50%] -translate-[50%] scale-100 rotate-0 transition-all dark:scale-0 dark:-rotate-90" />
                   <IconSunHigh class="absolute top-[50%] left-[50%] -translate-[50%] scale-0 rotate-90 transition-all dark:scale-100 dark:rotate-0" />
@@ -137,32 +144,36 @@ const isActive = (path: string) => {
       </nav>
     </div>
   </div>
-  <Hr />
+  <Hr noPadding />
 </header>
 
 <script>
   function toggleNav() {
-    const menuBtn = document.querySelector("#menu-btn");
-    const menuItems = document.querySelector("#menu-items");
+    const menuBtn = document.querySelector<HTMLButtonElement>("#menu-btn");
+    const menuItems = document.querySelector<HTMLElement>("#menu-items");
     const menuIcon = document.querySelector("#menu-icon");
     const closeIcon = document.querySelector("#close-icon");
 
     if (!menuBtn || !menuItems || !menuIcon || !closeIcon) return;
 
+    const setMenuState = (isOpen: boolean) => {
+      menuBtn.setAttribute("aria-expanded", String(isOpen));
+      menuBtn.setAttribute("aria-label", isOpen ? "Close menu" : "Open menu");
+      menuItems.classList.toggle("hidden", !isOpen);
+      menuItems.classList.toggle("grid", isOpen);
+      menuIcon.classList.toggle("hidden", isOpen);
+      closeIcon.classList.toggle("hidden", !isOpen);
+    };
+
     menuBtn.addEventListener("click", () => {
-      const openMenu = menuBtn.getAttribute("aria-expanded") === "true";
+      setMenuState(menuBtn.getAttribute("aria-expanded") !== "true");
+    });
 
-      menuBtn.setAttribute("aria-expanded", openMenu ? "false" : "true");
-      menuBtn.setAttribute("aria-label", openMenu ? "Open Menu" : "Close Menu");
-
-      menuItems.classList.toggle("hidden");
-      menuIcon.classList.toggle("hidden");
-      closeIcon.classList.toggle("hidden");
+    menuItems.querySelectorAll("a").forEach(link => {
+      link.addEventListener("click", () => setMenuState(false));
     });
   }
 
   toggleNav();
-
-  // Runs on view transitions navigation
   document.addEventListener("astro:after-swap", toggleNav);
 </script>
