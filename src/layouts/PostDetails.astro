@@ -35,7 +35,10 @@ const {
   hideEditPost,
 } = post.data;
 
-const { Content } = await render(post);
+const { Content, headings } = await render(post);
+const tableOfContents = headings.filter(({ depth }) => depth === 2);
+const wordCount = (post.body ?? "").trim().split(/\s+/u).length;
+const readingMinutes = Math.max(1, Math.ceil(wordCount / 225));
 
 let ogImageUrl: string | undefined;
 
@@ -99,8 +102,12 @@ const nextPost =
     >
       {title}
     </h1>
-    <div class="my-2 flex items-center gap-2">
+    <div class="my-3 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono">
       <Datetime {pubDatetime} {modDatetime} {timezone} size="lg" />
+      <span aria-hidden="true" class="text-foreground/45">·</span>
+      <span class="text-sm text-foreground/70 sm:text-base">
+        {readingMinutes} min read
+      </span>
       <span
         aria-hidden="true"
         class:list={[
@@ -110,6 +117,41 @@ const nextPost =
       >
       <EditPost {hideEditPost} {post} class="max-sm:hidden" />
     </div>
+
+    <p
+      class="mt-6 rounded-lg border-s-2 border-accent bg-muted/25 px-4 py-3 leading-7 text-foreground/80"
+    >
+      <span class="font-mono text-sm font-semibold text-foreground">
+        In brief:
+      </span>
+      {description}
+    </p>
+
+    {
+      tableOfContents.length > 1 && (
+        <details
+          data-pagefind-ignore
+          class="mt-5 rounded-lg border border-border bg-background px-4 py-3"
+        >
+          <summary class="cursor-pointer font-mono text-sm font-semibold text-accent">
+            On this page
+          </summary>
+          <ol class="mt-3 grid gap-x-6 gap-y-2 border-t border-dashed border-border pt-3 text-sm sm:grid-cols-2">
+            {tableOfContents.map(heading => (
+              <li>
+                <a
+                  href={"#" + heading.slug}
+                  class="decoration-dashed underline-offset-4 hover:text-accent hover:underline"
+                >
+                  {heading.text}
+                </a>
+              </li>
+            ))}
+          </ol>
+        </details>
+      )
+    }
+
     <article
       id="article"
       class="app-prose mx-auto mt-8 max-w-app prose-pre:bg-(--shiki-light-bg) dark:prose-pre:bg-(--shiki-dark-bg)"
@@ -212,7 +254,9 @@ const nextPost =
    *  allowing sharing of sections easily */
   function addHeadingLinks() {
     const headings = Array.from(
-      document.querySelectorAll("h2, h3, h4, h5, h6")
+      document.querySelectorAll(
+        "#article h2, #article h3, #article h4, #article h5, #article h6"
+      )
     );
     for (const heading of headings) {
       heading.classList.add("group");
