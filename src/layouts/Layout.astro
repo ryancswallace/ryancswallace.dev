@@ -33,6 +33,7 @@ const canonicalURLString = canonicalURL.toString();
 const person = {
   "@type": "Person",
   name: author,
+  jobTitle: "Software and machine learning engineer",
   ...(profile && { url: profile }),
 };
 
@@ -82,7 +83,9 @@ const structuredData = pubDatetime
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width" />
-    <link rel="icon" type="image/svg+xml" href="/rw_favicons/favicon.ico" />
+    <link rel="icon" type="image/x-icon" href="/rw_favicons/favicon.ico" />
+    <link rel="apple-touch-icon" href="/rw_favicons/apple-touch-icon.png" />
+    <link rel="manifest" href="/rw_favicons/site.webmanifest" />
     <link rel="canonical" href={canonicalURL} />
     <meta name="generator" content={Astro.generator} />
 
@@ -138,7 +141,7 @@ const structuredData = pubDatetime
       href={new URL("rss.xml", Astro.site)}
     />
 
-    <meta name="theme-color" content="" />
+    <meta name="theme-color" content="#fdfdfd" />
 
     {
       PUBLIC_GOOGLE_SITE_VERIFICATION && (

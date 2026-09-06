@@ -72,22 +72,31 @@ const isActive = (path: string) => {
             <a
               href="/#selected-work"
               class:list={{ "active-nav": isActive("/") }}
+              aria-current={isActive("/") ? "page" : undefined}
             >
               Work
             </a>
           </li>
           <li class="col-span-2 sm:col-span-1">
-            <a href="/posts" class:list={{ "active-nav": isActive("/posts") }}>
+            <a
+              href="/posts"
+              class:list={{ "active-nav": isActive("/posts") }}
+              aria-current={isActive("/posts") ? "page" : undefined}
+            >
               Writing
             </a>
           </li>
           <li class="col-span-2 sm:col-span-1">
-            <a href="/about" class:list={{ "active-nav": isActive("/about") }}>
+            <a
+              href="/about"
+              class:list={{ "active-nav": isActive("/about") }}
+              aria-current={isActive("/about") ? "page" : undefined}
+            >
               About
             </a>
           </li>
           <li class="col-span-2 sm:col-span-1">
-            <a href="https://resume.ryancswallace.dev">Résumé</a>
+            <a href="https://resume.ryancswallace.dev">Resume</a>
           </li>
           {
             SITE.showArchives && (
@@ -101,6 +110,7 @@ const isActive = (path: string) => {
                     },
                   ]}
                   ariaLabel="Archives"
+                  ariaCurrent={isActive("/archives") ? "page" : undefined}
                   title="Archives"
                 >
                   <IconArchive class="hidden sm:inline-block" />
@@ -117,6 +127,7 @@ const isActive = (path: string) => {
                 { "[&>svg]:stroke-accent": isActive("/search") },
               ]}
               ariaLabel="Search"
+              ariaCurrent={isActive("/search") ? "page" : undefined}
               title="Search"
             >
               <IconSearch />
@@ -149,12 +160,13 @@ const isActive = (path: string) => {
 
 <script>
   function toggleNav() {
+    const navMenu = document.querySelector<HTMLElement>("#nav-menu");
     const menuBtn = document.querySelector<HTMLButtonElement>("#menu-btn");
     const menuItems = document.querySelector<HTMLElement>("#menu-items");
     const menuIcon = document.querySelector("#menu-icon");
     const closeIcon = document.querySelector("#close-icon");
 
-    if (!menuBtn || !menuItems || !menuIcon || !closeIcon) return;
+    if (!navMenu || !menuBtn || !menuItems || !menuIcon || !closeIcon) return;
 
     const setMenuState = (isOpen: boolean) => {
       menuBtn.setAttribute("aria-expanded", String(isOpen));
@@ -171,6 +183,13 @@ const isActive = (path: string) => {
 
     menuItems.querySelectorAll("a").forEach(link => {
       link.addEventListener("click", () => setMenuState(false));
+    });
+
+    navMenu.addEventListener("keydown", event => {
+      if (event.key !== "Escape") return;
+
+      setMenuState(false);
+      menuBtn.focus();
     });
   }
 
