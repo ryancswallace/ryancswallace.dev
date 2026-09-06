@@ -2,7 +2,7 @@ export const SITE = {
   website: "https://ryancswallace.dev/",
   author: "Ryan Wallace",
   profile: "https://ryancswallace.dev/",
-  desc: "Ryan Wallace's personal portfolio, blog, and reference site.",
+  desc: "Ryan Wallace builds reliable data systems, applied AI/ML tools, and research infrastructure.",
   title: "Ryan Wallace",
   ogImage: "rw_favicons/android-chrome-512x512.png",
   lightAndDarkMode: true,
