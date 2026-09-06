@@ -24,7 +24,7 @@ description: How benchmatrix turns pytest-benchmark timings into paired, matrix-
 >
   <img
     class="h-auto w-full max-w-2xl !border-0"
-    src="https://raw.githubusercontent.com/ryancswallace/benchmatrix/main/docs/assets/benchmatrix-logo.svg"
+    src="/images/benchmatrix-logo.svg"
     alt="benchmatrix"
   />
 </div>
