@@ -17,7 +17,7 @@ const [primaryLink, ...supportingLinks] = project.links;
     <span class="text-xs font-semibold tracking-[0.16em] text-accent uppercase">
       {project.category}
     </span>
-    <span class="text-xs text-foreground/50" aria-hidden="true">
+    <span class="text-xs text-foreground/70" aria-hidden="true">
       {project.index}
     </span>
   </div>
@@ -35,11 +35,16 @@ const [primaryLink, ...supportingLinks] = project.links;
     {project.summary}
   </p>
 
-  <p
-    class="mt-5 border-s-2 border-accent/70 ps-3 text-sm leading-6 text-foreground/75"
-  >
-    {project.significance}
-  </p>
+  <div class="mt-5 border-s-2 border-accent/70 ps-3">
+    <p
+      class="font-mono text-xs font-semibold tracking-[0.12em] text-foreground/70 uppercase"
+    >
+      Engineering focus
+    </p>
+    <p class="mt-2 text-sm leading-6 text-foreground/75">
+      {project.significance}
+    </p>
+  </div>
 
   <ul
     class="mt-5 flex flex-wrap gap-2"
