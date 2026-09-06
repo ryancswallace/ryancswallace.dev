@@ -258,7 +258,7 @@ Run the complete local container suite with:
 make docker-check
 ```
 
-## Open-source and proprietary licensing
+## Open source and proprietary licensing
 
 Foundry can generate:
 
