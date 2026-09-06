@@ -40,6 +40,20 @@ html[data-theme="dark"] {
   body {
     @apply flex min-h-svh flex-col bg-background font-mono text-foreground selection:bg-accent/75 selection:text-background;
   }
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-mono;
+  }
+  code,
+  kbd,
+  samp,
+  pre {
+    @apply font-mono;
+  }
   a,
   button {
     @apply outline-offset-1 outline-accent focus-visible:no-underline focus-visible:outline-2 focus-visible:outline-dashed;
@@ -50,12 +64,16 @@ html[data-theme="dark"] {
   }
   section,
   footer {
-    @apply mx-auto max-w-app px-4;
+    @apply mx-auto w-full px-4;
   }
 }
 
 @utility max-w-app {
   @apply max-w-3xl;
+}
+
+@utility max-w-site {
+  @apply max-w-6xl;
 }
 
 .active-nav {
