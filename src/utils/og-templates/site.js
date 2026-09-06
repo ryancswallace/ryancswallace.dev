@@ -2,127 +2,108 @@ import satori from "satori";
 import { SITE } from "@/config";
 import loadGoogleFonts from "../loadGoogleFont";
 
-export default async () => {
-  return satori(
+const role = "SOFTWARE AND MACHINE LEARNING ENGINEER";
+const summary =
+  "Reliable data and ML systems, developer tools, and infrastructure.";
+
+export default async () =>
+  satori(
     {
       type: "div",
       props: {
         style: {
-          background: "#fefbfb",
+          background: "#212737",
+          color: "#eaedf3",
           width: "100%",
           height: "100%",
           display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
+          padding: "56px",
+          fontFamily: "IBM Plex Mono",
         },
-        children: [
-          {
-            type: "div",
-            props: {
-              style: {
-                position: "absolute",
-                top: "-1px",
-                right: "-1px",
-                border: "4px solid #000",
-                background: "#ecebeb",
-                opacity: "0.9",
-                borderRadius: "4px",
-                display: "flex",
-                justifyContent: "center",
-                margin: "2.5rem",
-                width: "88%",
-                height: "80%",
-              },
+        children: {
+          type: "div",
+          props: {
+            style: {
+              border: "3px solid #ab4b08",
+              borderRadius: "18px",
+              width: "100%",
+              height: "100%",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "space-between",
+              padding: "56px 64px",
             },
-          },
-          {
-            type: "div",
-            props: {
-              style: {
-                border: "4px solid #000",
-                background: "#fefbfb",
-                borderRadius: "4px",
-                display: "flex",
-                justifyContent: "center",
-                margin: "2rem",
-                width: "88%",
-                height: "80%",
-              },
-              children: {
+            children: [
+              {
                 type: "div",
                 props: {
                   style: {
                     display: "flex",
                     flexDirection: "column",
-                    justifyContent: "space-between",
-                    margin: "20px",
-                    width: "90%",
-                    height: "90%",
                   },
                   children: [
                     {
-                      type: "div",
+                      type: "p",
                       props: {
                         style: {
-                          display: "flex",
-                          flexDirection: "column",
-                          justifyContent: "center",
-                          alignItems: "center",
-                          height: "90%",
-                          maxHeight: "90%",
-                          overflow: "hidden",
-                          textAlign: "center",
+                          color: "#ff6b01",
+                          fontSize: 24,
+                          fontWeight: 700,
+                          letterSpacing: "0.08em",
+                          margin: 0,
                         },
-                        children: [
-                          {
-                            type: "p",
-                            props: {
-                              style: { fontSize: 72, fontWeight: "bold" },
-                              children: SITE.title,
-                            },
-                          },
-                          {
-                            type: "p",
-                            props: {
-                              style: { fontSize: 28 },
-                              children: SITE.desc,
-                            },
-                          },
-                        ],
+                        children: role,
                       },
                     },
                     {
-                      type: "div",
+                      type: "p",
                       props: {
                         style: {
-                          display: "flex",
-                          justifyContent: "flex-end",
-                          width: "100%",
-                          marginBottom: "8px",
-                          fontSize: 28,
+                          fontSize: 72,
+                          fontWeight: 700,
+                          lineHeight: 1.1,
+                          margin: "30px 0 0",
                         },
-                        children: {
-                          type: "span",
-                          props: {
-                            style: { overflow: "hidden", fontWeight: "bold" },
-                            children: new URL(SITE.website).hostname,
-                          },
+                        children: SITE.title,
+                      },
+                    },
+                    {
+                      type: "p",
+                      props: {
+                        style: {
+                          color: "#cfd4df",
+                          fontSize: 30,
+                          lineHeight: 1.45,
+                          margin: "28px 0 0",
+                          maxWidth: "900px",
                         },
+                        children: summary,
                       },
                     },
                   ],
                 },
               },
-            },
+              {
+                type: "p",
+                props: {
+                  style: {
+                    color: "#ff6b01",
+                    fontSize: 26,
+                    fontWeight: 700,
+                    margin: 0,
+                  },
+                  children: new URL(SITE.website).hostname,
+                },
+              },
+            ],
           },
-        ],
+        },
       },
     },
     {
       width: 1200,
       height: 630,
       embedFont: true,
-      fonts: await loadGoogleFonts(SITE.title + SITE.desc + SITE.website),
+      fonts: await loadGoogleFonts(role + SITE.title + summary + SITE.website),
     }
   );
-};
