@@ -15,5 +15,20 @@ Built with **Astro** + **AstroPaper**. Deployed on **GitHub Pages**.
 ## Quickstart
 
 ```bash
+nvm use
+corepack enable
+make install
+make dev
+```
+
+Run the complete local verification sequence with:
+
+```bash
+make ci
+```
+
+See every available development command with:
+
+```bash
 make help
 ```

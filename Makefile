@@ -58,8 +58,12 @@ format-check: ## Check formatting with Prettier.
 .PHONY: test
 test: check lint format-check ## Run the project's verification suite.
 
+.PHONY: site-check
+site-check: build ## Check built HTML, accessibility basics, and internal links.
+	$(PNPM) run test:site
+
 .PHONY: ci
-ci: install-frozen test build ## Run the local CI sequence.
+ci: install-frozen test site-check ## Run the local CI sequence.
 
 .PHONY: astro
 astro: ## Run an Astro CLI command, e.g. make astro ARGS="info".
