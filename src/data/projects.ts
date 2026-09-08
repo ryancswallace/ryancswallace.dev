@@ -3,6 +3,12 @@ export interface ProjectLink {
   href: string;
 }
 
+export interface ProjectComponent {
+  name: string;
+  summary: string;
+  href: string;
+}
+
 export interface Project {
   index: string;
   name: string;
@@ -11,33 +17,60 @@ export interface Project {
   significance: string;
   technologies: string[];
   links: ProjectLink[];
+  titleHref?: string;
+  featured?: boolean;
+  components?: ProjectComponent[];
 }
 
 export const PROJECTS: Project[] = [
   {
     index: "01",
-    name: "Jobman ecosystem",
-    category: "Systems engineering",
+    name: "Jobman",
+    category: "Job execution platform",
     summary:
-      "A set of Go services and command-line tools I built for durable background jobs, shared coordination, and AI-assisted diagnostics.",
+      "A job execution platform with daemonless local operation and an optional shared control plane for durable background work, scheduling, retries, logs, and failure analysis.",
     significance:
-      "The system spans process-tree control, SQLite and PostgreSQL state, concurrency coordination, OIDC, and failure analysis.",
-    technologies: ["Go", "SQLite/PostgreSQL", "Distributed systems", "AI"],
+      "Built around transactional state transitions, concurrent coordination, cross-platform process control, and explicit failure recovery.",
+    technologies: [
+      "Go",
+      "SQLite",
+      "PostgreSQL",
+      "OIDC",
+      "Distributed systems",
+      "LLM integration",
+    ],
+    titleHref: "https://jobman.tech/",
     links: [
       {
-        label: "Case study",
-        href: "/posts/jobman-a-practical-job-manager-for-research-computing/",
+        label: "Articles",
+        href: "/tags/jobman/",
       },
       {
         label: "GitHub",
         href: "https://github.com/ryancswallace/Jobman",
       },
       {
-        label: "Control plane",
+        label: "Docs",
+        href: "https://jobman.tech/",
+      },
+    ],
+    featured: true,
+    components: [
+      {
+        name: "Jobman",
+        summary:
+          "Local job execution, process supervision, SQLite-backed state, and the command-line interface.",
+        href: "https://github.com/ryancswallace/Jobman",
+      },
+      {
+        name: "Jobman Control",
+        summary:
+          "PostgreSQL-backed coordination and authenticated control across machines.",
         href: "https://github.com/ryancswallace/Jobman-Control",
       },
       {
-        label: "AI diagnostics",
+        name: "Jobman Diagnose",
+        summary: "Deterministic and AI-assisted failure analysis.",
         href: "https://github.com/ryancswallace/Jobman-Diagnose",
       },
     ],
@@ -47,13 +80,13 @@ export const PROJECTS: Project[] = [
     name: "benchmatrix",
     category: "Performance engineering",
     summary:
-      "A Python toolkit I built to turn pytest-benchmark results into reproducible performance experiments.",
+      "A Python toolkit for running reproducible benchmark matrices, collecting repeated measurements, and detecting performance regressions.",
     significance:
-      "It supports process-level replication, paired designs, matrix-aware comparisons, and statistical regression gates for CI.",
+      "Treats performance testing as an experiment, with paired designs, evidence thresholds, statistical comparisons, and machine-readable reports.",
     technologies: ["Python", "pytest", "Statistics", "CI"],
     links: [
       {
-        label: "Case study",
+        label: "Technical deep dive",
         href: "/posts/benchmatrix-performance-benchmarking-as-an-experiment/",
       },
       {
@@ -64,34 +97,18 @@ export const PROJECTS: Project[] = [
         label: "Docs",
         href: "https://ryancswallace.github.io/benchmatrix/",
       },
+      {
+        label: "PyPI",
+        href: "https://pypi.org/project/benchmatrix/",
+      },
     ],
   },
   {
     index: "03",
-    name: "Vector Search Study",
-    category: "ML systems",
-    summary:
-      "A benchmark suite I built to compare exact vector-search implementations under deterministic, correctness-checked workloads.",
-    significance:
-      "It validates every measured cell against an oracle and separates pilot analysis from paired confirmatory experiments.",
-    technologies: ["Python", "Vector search", "NumPy", "scikit-learn"],
-    links: [
-      {
-        label: "GitHub",
-        href: "https://github.com/ryancswallace/vector-search-study",
-      },
-      {
-        label: "Docs",
-        href: "https://ryancswallace.github.io/vector-search-study/",
-      },
-    ],
-  },
-  {
-    index: "04",
     name: "Python Project Foundry",
     category: "Developer experience",
     summary:
-      "A project generator I built to create production-ready Python repositories from a short interactive questionnaire.",
+      "An opinionated project generator that creates production-ready Python package repositories from a short interactive questionnaire.",
     significance:
       "Generated projects include typed source layouts, tests, documentation, security checks, packaging, containers, CI, and release automation.",
     technologies: ["Python", "uv", "GitHub Actions", "Containers"],
