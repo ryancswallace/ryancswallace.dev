@@ -1,13 +1,13 @@
 ---
 layout: "@/layouts/AboutLayout.astro"
 title: "About"
-description: "About Ryan Wallace, a software and machine learning engineer focused on data systems, developer tools, and infrastructure."
+description: "About Ryan Wallace, Lead Data Scientist at the Federal Reserve Bank of Boston and a software and machine learning engineer."
 ---
 
 Hi, I’m Ryan. I’m a software and machine learning engineer focused on reliable
-data systems, developer tools, and infrastructure. My work at the Federal
-Reserve Bank of Boston included large-scale data platforms, applied modeling,
-and research tooling.
+data systems, developer tools, and infrastructure. I’m a Lead Data Scientist at
+the Federal Reserve Bank of Boston, where I’ve worked since December 2019. My
+work includes large-scale data platforms, applied modeling, and research tooling.
 
 This site collects my [open source projects](/#selected-work) and
 [technical writing](/posts/). My background in computer science and statistics
